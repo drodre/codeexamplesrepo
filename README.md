@@ -17,5 +17,10 @@ This repository contains the following sample applications:
     *   A minimal Python web application using Flask that returns "Hello World".
     *   [View Details](./python/helloworld/README.md)
 
+*   **PHP Laravel Hello World App**:
+    *   Located in `php/laravel-helloworld`.
+    *   A minimal Laravel application that returns "Hello World".
+    *   [View Details](./php/laravel-helloworld/README.md)
+
 
 
