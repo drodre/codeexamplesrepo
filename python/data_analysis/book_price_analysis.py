@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
+import argparse
 
-# Path to your dataset
-# Make sure to replace 'book_prices.csv' with the actual name of your dataset file
-# and ensure the file is in the same directory as this script,
-# or provide the full path to the file.
-dataset_path = 'book_prices.csv'
+# Set up argument parser
+parser = argparse.ArgumentParser(description="Analyze book prices from a CSV file.")
+parser.add_argument('--dataset_path', type=str, default='book_prices.csv',
+                    help="Path to the dataset CSV file (default: 'book_prices.csv')")
+
+args = parser.parse_args()
+dataset_path = args.dataset_path
 
 try:
     # Load the dataset
@@ -18,6 +21,28 @@ try:
     # Print the column names
     print("\nColumn names:")
     print(df.columns)
+
+    # Identify empty rows (all values are NaN)
+    empty_rows = df.isnull().all(axis=1)
+    num_empty_rows = empty_rows.sum()
+
+    print(f"\nNumber of empty rows (all values NaN): {num_empty_rows}")
+    if num_empty_rows > 0:
+        print("Indices of empty rows:")
+        print(df[empty_rows].index.tolist())
+
+    # Identify duplicate rows based on 'codigo_isbn'
+    # The `keep=False` argument marks all duplicates, including the first occurrence.
+    # To only get subsequent duplicates, we can use `keep='first'` and then filter.
+    duplicates_isbn = df[df.duplicated(subset=['codigo_isbn'], keep=False)]
+    # To count only the *extra* copies, not all items that are part of a duplicate set:
+    num_duplicate_isbn_entries = df.duplicated(subset=['codigo_isbn'], keep='first').sum()
+
+    print(f"\nNumber of duplicate entries based on 'codigo_isbn' (excluding first occurrences): {num_duplicate_isbn_entries}")
+    if num_duplicate_isbn_entries > 0:
+        print("Duplicate rows (based on 'codigo_isbn', showing all occurrences of duplicates):")
+        # Displaying rows that are marked as duplicates (all occurrences)
+        print(duplicates_isbn.sort_values(by='codigo_isbn'))
 
     print("\nSuccessfully loaded dataset. You can now start exploring and cleaning the data!")
 
