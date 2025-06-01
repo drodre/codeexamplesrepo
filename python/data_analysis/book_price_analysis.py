@@ -36,6 +36,59 @@ def analyze_book_prices(csv_file):
             # Displaying rows that are marked as duplicates (all occurrences)
             print(duplicates_isbn.sort_values(by='codigo_isbn'))
 
+        # --- Processing 'fecha_publicacion' ---
+        print("\n--- Processing 'fecha_publicacion' ---")
+        df['fecha_publicacion'] = pd.to_datetime(df['fecha_publicacion'], errors='coerce')
+        num_nat = df['fecha_publicacion'].isnull().sum()
+        print(f"Number of rows with unparseable dates (NaT): {num_nat}")
+        print(f"Data type of 'fecha_publicacion' after conversion: {df['fecha_publicacion'].dtype}")
+        if len(df) - num_nat > 0: # Check if there are any valid dates
+            print("First 5 values of 'fecha_publicacion' after conversion:")
+            print(df['fecha_publicacion'].head())
+        else:
+            print("No valid dates found in 'fecha_publicacion' after conversion.")
+
+        # --- Validating 'nro_paginas' ---
+        print("\n--- Validating 'nro_paginas' ---")
+        original_nans_nro_paginas = df['nro_paginas'].isnull().sum()
+        df['nro_paginas'] = pd.to_numeric(df['nro_paginas'], errors='coerce')
+        coerced_nans_nro_paginas = df['nro_paginas'].isnull().sum() - original_nans_nro_paginas
+        print(f"Number of rows with non-numeric 'nro_paginas' (coerced to NaN): {coerced_nans_nro_paginas}")
+        print(f"Total NaN values in 'nro_paginas' after conversion: {df['nro_paginas'].isnull().sum()}")
+        print(f"Data type of 'nro_paginas' after conversion: {df['nro_paginas'].dtype}")
+        print("Descriptive statistics for 'nro_paginas':")
+        print(df['nro_paginas'].describe())
+
+        print("\nPotential outliers in 'nro_paginas' (e.g., 1 page books):")
+        one_page_books = df[df['nro_paginas'] == 1]
+        if not one_page_books.empty:
+            print(one_page_books.head())
+        else:
+            print("No books found with exactly 1 page.")
+
+        # --- Validating 'precio' ---
+        print("\n--- Validating 'precio' ---")
+        original_nans_precio = df['precio'].isnull().sum()
+        df['precio'] = pd.to_numeric(df['precio'], errors='coerce')
+        coerced_nans_precio = df['precio'].isnull().sum() - original_nans_precio
+        print(f"Number of rows with non-numeric 'precio' (coerced to NaN): {coerced_nans_precio}")
+        print(f"Total NaN values in 'precio' after conversion: {df['precio'].isnull().sum()}")
+        print(f"Data type of 'precio' after conversion: {df['precio'].dtype}")
+        print("Descriptive statistics for 'precio':")
+        print(df['precio'].describe())
+
+        print("\nPotential outliers in 'precio' (max price books):")
+        max_price = df['precio'].max()
+        if pd.notna(max_price): # Check if max_price is not NaN (i.e., if 'precio' column is not all NaN)
+            max_price_books = df[df['precio'] == max_price]
+            if not max_price_books.empty:
+                print(max_price_books)
+            else:
+                # This case should ideally not be reached if max_price is not NaN and describe() worked.
+                print("No books found at the maximum price (this is unexpected if max price was calculated).")
+        else:
+            print("Cannot determine maximum price as 'precio' column might be all NaN or empty.")
+
         print("\nSuccessfully processed dataset. Basic checks for empty rows and duplicates are complete.")
 
     except FileNotFoundError:
@@ -54,4 +107,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
