@@ -59,6 +59,19 @@ def analyze_book_prices(csv_file):
         print("Descriptive statistics for 'nro_paginas':")
         print(df['nro_paginas'].describe())
 
+
+        # Impute NaNs in nro_paginas with 0
+        nan_count_before_imputation = df['nro_paginas'].isnull().sum()
+        if nan_count_before_imputation > 0:
+            df['nro_paginas'].fillna(0, inplace=True)
+            print(f"Imputed {nan_count_before_imputation} NaN values in 'nro_paginas' with 0.")
+            # Display descriptive statistics again to see the impact of imputation
+            print("Descriptive statistics for 'nro_paginas' after imputation:")
+            print(df['nro_paginas'].describe())
+        else:
+            print("No NaN values to impute in 'nro_paginas'.")
+
+
         print("\nPotential outliers in 'nro_paginas' (e.g., 1 page books):")
         one_page_books = df[df['nro_paginas'] == 1]
         if not one_page_books.empty:
@@ -88,6 +101,17 @@ def analyze_book_prices(csv_file):
                 print("No books found at the maximum price (this is unexpected if max price was calculated).")
         else:
             print("Cannot determine maximum price as 'precio' column might be all NaN or empty.")
+        # --- Currency Conversion for 'precio' (ARS to EUR) ---
+        print("\n--- Currency Conversion 'precio' ARS to EUR ---")
+        ars_to_eur_rate = 1340  # 1 EUR = 1340 ARS
+        df['precio_eur'] = (df['precio'] / ars_to_eur_rate).round(2)
+
+        print(f"Converted 'precio' to 'precio_eur' using rate: 1 EUR = {ars_to_eur_rate} ARS.")
+        print("First 5 rows with ARS and EUR prices:")
+        print(df[['titulo', 'precio', 'precio_eur']].head())
+
+        print("\nDescriptive statistics for 'precio_eur':")
+        print(df['precio_eur'].describe())
 
         print("\nSuccessfully processed dataset. Basic checks for empty rows and duplicates are complete.")
 
