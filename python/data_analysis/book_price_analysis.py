@@ -27,28 +27,28 @@ def analyze_book_prices(csv_file):
         print("\nSuccessfully loaded dataset. You can now start exploring and cleaning the data!")
 
     # Identify empty rows (all values are NaN)
-    empty_rows = df.isnull().all(axis=1)
-    num_empty_rows = empty_rows.sum()
+        empty_rows = df.isnull().all(axis=1)
+        num_empty_rows = empty_rows.sum()
 
-    print(f"\nNumber of empty rows (all values NaN): {num_empty_rows}")
-    if num_empty_rows > 0:
-        print("Indices of empty rows:")
-        print(df[empty_rows].index.tolist())
+        print(f"\nNumber of empty rows (all values NaN): {num_empty_rows}")
+        if num_empty_rows > 0:
+            print("Indices of empty rows:")
+            print(df[empty_rows].index.tolist())
 
-    # Identify duplicate rows based on 'codigo_isbn'
-    # The `keep=False` argument marks all duplicates, including the first occurrence.
-    # To only get subsequent duplicates, we can use `keep='first'` and then filter.
-    duplicates_isbn = df[df.duplicated(subset=['codigo_isbn'], keep=False)]
-    # To count only the *extra* copies, not all items that are part of a duplicate set:
-    num_duplicate_isbn_entries = df.duplicated(subset=['codigo_isbn'], keep='first').sum()
+        # Identify duplicate rows based on 'codigo_isbn'
+        # The `keep=False` argument marks all duplicates, including the first occurrence.
+        # To only get subsequent duplicates, we can use `keep='first'` and then filter.
+        duplicates_isbn = df[df.duplicated(subset=['codigo_isbn'], keep=False)]
+        # To count only the *extra* copies, not all items that are part of a duplicate set:
+        num_duplicate_isbn_entries = df.duplicated(subset=['codigo_isbn'], keep='first').sum()
 
-    print(f"\nNumber of duplicate entries based on 'codigo_isbn' (excluding first occurrences): {num_duplicate_isbn_entries}")
-    if num_duplicate_isbn_entries > 0:
-        print("Duplicate rows (based on 'codigo_isbn', showing all occurrences of duplicates):")
-        # Displaying rows that are marked as duplicates (all occurrences)
-        print(duplicates_isbn.sort_values(by='codigo_isbn'))
+        print(f"\nNumber of duplicate entries based on 'codigo_isbn' (excluding first occurrences): {num_duplicate_isbn_entries}")
+        if num_duplicate_isbn_entries > 0:
+            print("Duplicate rows (based on 'codigo_isbn', showing all occurrences of duplicates):")
+            # Displaying rows that are marked as duplicates (all occurrences)
+            print(duplicates_isbn.sort_values(by='codigo_isbn'))
 
-    print("\nSuccessfully loaded dataset. You can now start exploring and cleaning the data!")
+        print("\nSuccessfully loaded dataset. You can now start exploring and cleaning the data!")
 
     except FileNotFoundError:
         print(f"Error: The file '{csv_file}' was not found.")
