@@ -59,6 +59,7 @@ def analyze_book_prices(csv_file):
         print("Descriptive statistics for 'nro_paginas':")
         print(df['nro_paginas'].describe())
 
+
         # Impute NaNs in nro_paginas with 0
         nan_count_before_imputation = df['nro_paginas'].isnull().sum()
         if nan_count_before_imputation > 0:
@@ -69,6 +70,7 @@ def analyze_book_prices(csv_file):
             print(df['nro_paginas'].describe())
         else:
             print("No NaN values to impute in 'nro_paginas'.")
+
 
         print("\nPotential outliers in 'nro_paginas' (e.g., 1 page books):")
         one_page_books = df[df['nro_paginas'] == 1]
@@ -99,7 +101,6 @@ def analyze_book_prices(csv_file):
                 print("No books found at the maximum price (this is unexpected if max price was calculated).")
         else:
             print("Cannot determine maximum price as 'precio' column might be all NaN or empty.")
-
         # --- Currency Conversion for 'precio' (ARS to EUR) ---
         print("\n--- Currency Conversion 'precio' ARS to EUR ---")
         ars_to_eur_rate = 1340  # 1 EUR = 1340 ARS
