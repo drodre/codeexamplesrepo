@@ -113,6 +113,57 @@ def analyze_book_prices(csv_file):
         print("\nDescriptive statistics for 'precio_eur':")
         print(df['precio_eur'].describe())
 
+        # --- Text Column Cleaning ---
+        print("\n--- Preparing for Text Column Cleaning ---")
+        text_columns_to_clean = [
+            'titulo', 'autor', 'editorial', 'idioma', 
+            'encuadernacion', 'categoria', 'genero', 'subgenero'
+        ]
+        # Ensure all listed columns exist in the DataFrame to avoid errors during cleaning
+        text_columns_to_clean = [col for col in text_columns_to_clean if col in df.columns]
+        print(f"Identified text columns for cleaning: {text_columns_to_clean}")
+
+        for col in text_columns_to_clean:
+            # Ensure column is treated as string, fill NaNs with empty string for string operations
+            # NaNs might have been introduced if a column was unexpectedly numeric/boolean and then selected.
+            # Or they might be original NaNs. Treating as empty string for .str methods to work.
+            df[col] = df[col].astype(str).fillna('') # Convert to string and fill potential NaNs
+            
+            # Check if column is not purely numeric before applying string methods more suited for text
+            # This is a safeguard, though astype(str) handles most things.
+            # We expect these to be text, but good to be cautious.
+            if pd.api.types.is_string_dtype(df[col]) or df[col].dtype == 'object':
+                df[col] = df[col].str.strip()
+                df[col] = df[col].str.lower()
+                print(f"Applied basic cleaning (strip, lower) to column: '{col}'")
+            else:
+                print(f"Skipped string methods for column: '{col}' as it's not predominantly string-like after astype(str). Current dtype: {df[col].dtype}")
+        
+        # Replace empty strings that resulted from NaNs or were original empty strings with np.nan 
+        # if you want to maintain NaN for truly missing values after cleaning.
+        # This step is optional and depends on how you want to treat genuinely empty text fields vs. original NaNs.
+        # For now, we'll leave them as empty strings as per .fillna(''). If NaNs are preferred:
+        # for col in text_columns_to_clean:
+        #     df[col] = df[col].replace('', np.nan) 
+        # print("Replaced empty strings with np.nan where applicable after cleaning.")
+
+        print("\n--- Inspecting Unique Values in Key Categorical Columns After Basic Cleaning ---")
+        key_categorical_columns = ['idioma', 'encuadernacion', 'categoria', 'genero']
+        
+        for col in key_categorical_columns:
+            if col in df.columns: # Check if column exists
+                unique_values = df[col].unique()
+                print(f"Unique values in '{col}' (sample of up to 20):")
+                # Print all if less than 20, otherwise print a sample to keep output manageable
+                if len(unique_values) > 20:
+                    print(np.random.choice(unique_values, size=20, replace=False)) # Show a random sample
+                else:
+                    print(unique_values)
+                print(f"Total unique values in '{col}': {df[col].nunique()}")
+            else:
+                print(f"Column '{col}' not found in DataFrame for unique value inspection.")
+        print("--- End of Unique Value Inspection ---")
+
         # --- Save the cleaned DataFrame ---
         output_filename = 'cleaned_publicaciones_libros_ateneo.csv'
         try:
