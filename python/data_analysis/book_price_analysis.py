@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
 
 def analyze_book_prices(csv_file):
     try:
@@ -59,7 +60,6 @@ def analyze_book_prices(csv_file):
         print("Descriptive statistics for 'nro_paginas':")
         print(df['nro_paginas'].describe())
 
-
         # Impute NaNs in nro_paginas with 0
         nan_count_before_imputation = df['nro_paginas'].isnull().sum()
         if nan_count_before_imputation > 0:
@@ -70,7 +70,6 @@ def analyze_book_prices(csv_file):
             print(df['nro_paginas'].describe())
         else:
             print("No NaN values to impute in 'nro_paginas'.")
-
 
         print("\nPotential outliers in 'nro_paginas' (e.g., 1 page books):")
         one_page_books = df[df['nro_paginas'] == 1]
@@ -101,17 +100,111 @@ def analyze_book_prices(csv_file):
                 print("No books found at the maximum price (this is unexpected if max price was calculated).")
         else:
             print("Cannot determine maximum price as 'precio' column might be all NaN or empty.")
+
         # --- Currency Conversion for 'precio' (ARS to EUR) ---
         print("\n--- Currency Conversion 'precio' ARS to EUR ---")
         ars_to_eur_rate = 1340  # 1 EUR = 1340 ARS
         df['precio_eur'] = (df['precio'] / ars_to_eur_rate).round(2)
-
+        
         print(f"Converted 'precio' to 'precio_eur' using rate: 1 EUR = {ars_to_eur_rate} ARS.")
         print("First 5 rows with ARS and EUR prices:")
         print(df[['titulo', 'precio', 'precio_eur']].head())
-
+        
         print("\nDescriptive statistics for 'precio_eur':")
         print(df['precio_eur'].describe())
+
+        # --- Save the cleaned DataFrame ---
+        output_filename = 'cleaned_publicaciones_libros_ateneo.csv'
+        try:
+            df.to_csv(output_filename, index=False)
+            print(f"\nSuccessfully saved cleaned data to '{output_filename}'")
+        except Exception as e:
+            print(f"\nError saving cleaned data to '{output_filename}': {e}")
+
+        # --- Generate and Save Plots ---
+        print("\n--- Generating and Saving Plots ---")
+        
+        # Plot 1: Distribution of precio_eur
+        try:
+            plt.figure(figsize=(10, 6))
+            df['precio_eur'].plot(kind='hist', bins=50, edgecolor='black')
+            plt.title('Distribution of Book Prices (EUR)')
+            plt.xlabel('Price (EUR)')
+            plt.ylabel('Frequency')
+            plt.grid(axis='y', alpha=0.75)
+            plot_filename_price = 'precio_eur_distribution.png'
+            plt.savefig(plot_filename_price)
+            plt.close() # Close the figure to free memory
+            print(f"Saved price distribution plot to '{plot_filename_price}'")
+        except Exception as e:
+            print(f"Error generating or saving price distribution plot: {e}")
+
+        # Plot 2: Distribution of nro_paginas (pages > 0)
+        try:
+            plt.figure(figsize=(10, 6))
+            # Filter out rows where nro_paginas is 0 (our imputed value for NaN)
+            df_filtered_pages = df[df['nro_paginas'] > 0]
+            if not df_filtered_pages.empty:
+                df_filtered_pages['nro_paginas'].plot(kind='hist', bins=50, edgecolor='black')
+                plt.title('Distribution of Book Page Numbers (Pages > 0)')
+                plt.xlabel('Number of Pages')
+                plt.ylabel('Frequency')
+                plt.grid(axis='y', alpha=0.75)
+                plot_filename_pages = 'nro_paginas_distribution.png'
+                plt.savefig(plot_filename_pages)
+                plt.close() # Close the figure to free memory
+                print(f"Saved page number distribution plot to '{plot_filename_pages}'")
+            else:
+                print("No data with 'nro_paginas' > 0 to plot.")
+        except Exception as e:
+            print(f"Error generating or saving page number distribution plot: {e}")
+
+        # Plot 3: Book Counts by idioma (Top 10)
+        try:
+            plt.figure(figsize=(12, 7)) # Adjusted figure size for better label display
+            top_n_languages = 10
+            # Ensure 'idioma' column exists and is not all NaN, then proceed
+            if 'idioma' in df.columns and df['idioma'].notna().any():
+                idioma_counts = df['idioma'].value_counts().nlargest(top_n_languages)
+                if not idioma_counts.empty:
+                    idioma_counts.plot(kind='bar', edgecolor='black')
+                    plt.title(f'Top {top_n_languages} Book Languages')
+                    plt.xlabel('Idioma (Language)')
+                    plt.ylabel('Number of Books')
+                    plt.xticks(rotation=45, ha='right') # Rotate labels for better readability
+                    plt.tight_layout() # Adjust layout to prevent labels from being cut off
+                    plt.grid(axis='y', alpha=0.75)
+                    plot_filename_idioma = 'idioma_counts.png'
+                    plt.savefig(plot_filename_idioma)
+                    plt.close() # Close the figure to free memory
+                    print(f"Saved language counts plot to '{plot_filename_idioma}'")
+                else:
+                    print("No data for 'idioma' counts to plot (perhaps all NaN or empty after filtering).")
+            else:
+                print("'idioma' column not found or contains all NaN values. Skipping plot.")
+        except Exception as e:
+            print(f"Error generating or saving language counts plot: {e}")
+
+        # Plot 4: Scatter plot of nro_paginas (pages > 0) vs precio_eur
+        try:
+            plt.figure(figsize=(10, 6))
+            # Filter out rows where nro_paginas is 0 for a more meaningful scatter plot
+            df_filtered_scatter = df[df['nro_paginas'] > 0]
+            if not df_filtered_scatter.empty:
+                # Using a smaller alpha for transparency to see point density
+                df_filtered_scatter.plot(kind='scatter', x='nro_paginas', y='precio_eur', alpha=0.5)
+                plt.title('Book Price (EUR) vs. Number of Pages (Pages > 0)')
+                plt.xlabel('Number of Pages')
+                plt.ylabel('Price (EUR)')
+                plt.grid(True, alpha=0.5)
+                plot_filename_scatter = 'price_vs_pages.png'
+                plt.savefig(plot_filename_scatter)
+                plt.close() # Close the figure to free memory
+                print(f"Saved price vs. pages scatter plot to '{plot_filename_scatter}'")
+            else:
+                print("No data with 'nro_paginas' > 0 to create scatter plot.")
+        except Exception as e:
+            print(f"Error generating or saving price vs. pages scatter plot: {e}")
 
         print("\nSuccessfully processed dataset. Basic checks for empty rows and duplicates are complete.")
 
