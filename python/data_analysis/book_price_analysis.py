@@ -105,11 +105,11 @@ def analyze_book_prices(csv_file):
         print("\n--- Currency Conversion 'precio' ARS to EUR ---")
         ars_to_eur_rate = 1340  # 1 EUR = 1340 ARS
         df['precio_eur'] = (df['precio'] / ars_to_eur_rate).round(2)
-
+        
         print(f"Converted 'precio' to 'precio_eur' using rate: 1 EUR = {ars_to_eur_rate} ARS.")
         print("First 5 rows with ARS and EUR prices:")
         print(df[['titulo', 'precio', 'precio_eur']].head())
-
+        
         print("\nDescriptive statistics for 'precio_eur':")
         print(df['precio_eur'].describe())
 
@@ -137,11 +137,13 @@ def analyze_book_prices(csv_file):
                 print(f"Applied basic cleaning (strip, lower) to column: '{col}'")
             else:
                 print(f"Skipped string methods for column: '{col}' as it's not predominantly string-like after astype(str). Current dtype: {df[col].dtype}")
+
         # Replace empty strings that resulted from NaNs or were original empty strings with np.nan 
         # if you want to maintain NaN for truly missing values after cleaning.
         # This step is optional and depends on how you want to treat genuinely empty text fields vs. original NaNs.
         # For now, we'll leave them as empty strings as per .fillna(''). If NaNs are preferred:
         # for col in text_columns_to_clean:
+
         #     df[col] = df[col].replace('', np.nan)
         # print("Replaced empty strings with np.nan where applicable after cleaning.")
 
