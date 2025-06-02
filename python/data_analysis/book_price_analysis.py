@@ -116,7 +116,7 @@ def analyze_book_prices(csv_file):
         # --- Text Column Cleaning ---
         print("\n--- Preparing for Text Column Cleaning ---")
         text_columns_to_clean = [
-            'titulo', 'autor', 'editorial', 'idioma',
+            'titulo', 'autor', 'editorial', 'idioma', 
             'encuadernacion', 'categoria', 'genero', 'subgenero'
         ]
         # Ensure all listed columns exist in the DataFrame to avoid errors during cleaning
@@ -128,7 +128,6 @@ def analyze_book_prices(csv_file):
             # NaNs might have been introduced if a column was unexpectedly numeric/boolean and then selected.
             # Or they might be original NaNs. Treating as empty string for .str methods to work.
             df[col] = df[col].astype(str).fillna('') # Convert to string and fill potential NaNs
-
             # Check if column is not purely numeric before applying string methods more suited for text
             # This is a safeguard, though astype(str) handles most things.
             # We expect these to be text, but good to be cautious.
@@ -138,8 +137,7 @@ def analyze_book_prices(csv_file):
                 print(f"Applied basic cleaning (strip, lower) to column: '{col}'")
             else:
                 print(f"Skipped string methods for column: '{col}' as it's not predominantly string-like after astype(str). Current dtype: {df[col].dtype}")
-
-        # Replace empty strings that resulted from NaNs or were original empty strings with np.nan
+        # Replace empty strings that resulted from NaNs or were original empty strings with np.nan 
         # if you want to maintain NaN for truly missing values after cleaning.
         # This step is optional and depends on how you want to treat genuinely empty text fields vs. original NaNs.
         # For now, we'll leave them as empty strings as per .fillna(''). If NaNs are preferred:
@@ -165,6 +163,12 @@ def analyze_book_prices(csv_file):
         print("\n--- Inspecting Unique Values in Key Categorical Columns After Basic Cleaning ---")
         key_categorical_columns = ['idioma', 'encuadernacion', 'categoria', 'genero']
 
+        #     df[col] = df[col].replace('', np.nan) 
+        # print("Replaced empty strings with np.nan where applicable after cleaning.")
+
+        print("\n--- Inspecting Unique Values in Key Categorical Columns After Basic Cleaning ---")
+        key_categorical_columns = ['idioma', 'encuadernacion', 'categoria', 'genero']
+        
         for col in key_categorical_columns:
             if col in df.columns: # Check if column exists
                 unique_values = df[col].unique()
