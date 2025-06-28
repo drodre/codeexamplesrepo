@@ -5,6 +5,7 @@ import sys
 import os # Importar os
 from datetime import datetime, date
 from typing import Optional # Asegurar que Optional esté importado
+from contextlib import contextmanager # Importar contextmanager
 
 # Necesitaremos acceder a los módulos de la app
 # Esto asume que ejecutaremos main_cli.py desde el directorio raíz del repositorio,
@@ -27,16 +28,23 @@ except ImportError:
     from app import crud, models, database
 
 
+@contextmanager
 def obtener_sesion_db():
     """
-    Genera una sesión de base de datos.
+    Proporciona una sesión de base de datos transaccional a través de un context manager.
     """
-    db_gen = database.get_db()
-    db = next(db_gen)
+    db = database.SessionLocal()
     try:
         yield db
+        # El commit se hará explícitamente en las funciones CRUD
+        # o al final de una serie de operaciones si es necesario.
+        # Por ahora, las funciones CRUD hacen su propio commit.
+        # Si quisiéramos agrupar commits, lo haríamos aquí o en una capa de servicio.
+    except Exception:
+        db.rollback()
+        raise
     finally:
-        next(db_gen, None) # Asegura que la sesión se cierre correctamente
+        db.close()
 
 def main():
     # Crear tablas si no existen (esto es seguro llamarlo múltiples veces)
