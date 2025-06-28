@@ -1,10 +1,20 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from .models import Base # Importar Base desde models.py
 
-DATABASE_URL = "sqlite:///./data/medicamentos.db"
-# El /// indica una ruta relativa desde donde se ejecute el script.
-# Si ejecutamos desde la raíz de gestion_medicamentos, se creará en gestion_medicamentos/data/medicamentos.db
+# Construir la ruta absoluta a la base de datos
+# __file__ es la ruta al archivo actual (database.py)
+# os.path.dirname(__file__) es el directorio 'app'
+# os.path.join(..., '..', 'data', 'medicamentos.db') sube un nivel a 'gestion_medicamentos', luego a 'data'
+DATABASE_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'medicamentos.db'))
+DATABASE_URL = f"sqlite:///{DATABASE_FILE_PATH}"
+
+# Asegurarse de que el directorio data exista al definir el engine o al crear tablas
+DATA_DIR = os.path.dirname(DATABASE_FILE_PATH)
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+    print(f"Directorio '{DATA_DIR}' creado para la base de datos.")
 
 engine = create_engine(
     DATABASE_URL,
