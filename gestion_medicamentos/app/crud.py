@@ -1,0 +1,341 @@
+# Este archivo contendrá las funciones para Crear, Leer, Actualizar y Eliminar (CRUD)
+# datos de la base de datos.
+
+# Importaciones necesarias al inicio del archivo
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import func, and_
+from . import models # models.py en el mismo directorio
+from datetime import date
+from typing import List, Optional, Type # Para type hints
+
+# Más adelante añadiremos aquí las funciones CRUD específicas.
+
+# --- Funciones CRUD para Medicamento ---
+
+def crear_medicamento(db: Session, nombre: str, marca: Optional[str], unidades_por_caja: int, precio_referencia: Optional[float] = None) -> models.Medicamento:
+    """
+    Crea un nuevo registro de medicamento en la base de datos.
+    """
+    db_medicamento = models.Medicamento(
+        nombre=nombre,
+        marca=marca,
+        unidades_por_caja=unidades_por_caja,
+        precio_por_caja_referencia=precio_referencia
+    )
+    db.add(db_medicamento)
+    db.commit()
+    db.refresh(db_medicamento)
+    return db_medicamento
+
+def obtener_medicamento(db: Session, medicamento_id: int) -> Optional[models.Medicamento]:
+    """
+    Obtiene un medicamento por su ID.
+    """
+    return db.query(models.Medicamento).filter(models.Medicamento.id == medicamento_id).first()
+
+def obtener_medicamento_por_nombre(db: Session, nombre: str) -> Optional[models.Medicamento]:
+    """
+    Obtiene un medicamento por su nombre.
+    """
+    return db.query(models.Medicamento).filter(func.lower(models.Medicamento.nombre) == func.lower(nombre)).first()
+
+def obtener_medicamentos(db: Session, skip: int = 0, limit: int = 100) -> List[models.Medicamento]:
+    """
+    Obtiene una lista de medicamentos, con paginación opcional.
+    """
+    return db.query(models.Medicamento).offset(skip).limit(limit).all()
+
+def actualizar_medicamento(db: Session, medicamento_id: int, datos_actualizacion: dict) -> Optional[models.Medicamento]:
+    """
+    Actualiza un medicamento existente.
+    `datos_actualizacion` es un diccionario con los campos a actualizar.
+    Ej: {'nombre': 'Nuevo Nombre', 'marca': 'Nueva Marca'}
+    """
+    db_medicamento = obtener_medicamento(db, medicamento_id)
+    if db_medicamento:
+        for key, value in datos_actualizacion.items():
+            if hasattr(db_medicamento, key):
+                setattr(db_medicamento, key, value)
+            else:
+                # Opcional: lanzar un error si la clave no es válida
+                print(f"Advertencia: El campo '{key}' no existe en el modelo Medicamento y será ignorado.")
+        db.commit()
+        db.refresh(db_medicamento)
+    return db_medicamento
+
+def eliminar_medicamento(db: Session, medicamento_id: int) -> bool:
+    """
+    Elimina un medicamento por su ID.
+    Devuelve True si la eliminación fue exitosa, False en caso contrario.
+    Nota: Esto también eliminará los LotesStock y DetallesPedido asociados
+    debido a la configuración de `cascade="all, delete-orphan"` en los modelos.
+    """
+    db_medicamento = obtener_medicamento(db, medicamento_id)
+    if db_medicamento:
+        db.delete(db_medicamento)
+        db.commit()
+        return True
+    return False
+
+# --- Funciones de Utilidad/Calculadas para Medicamento ---
+
+def calcular_stock_total_unidades(db: Session, medicamento_id: int) -> int:
+    """
+    Calcula el stock total de unidades para un medicamento, sumando las unidades
+    de todos sus lotes activos (no vencidos).
+    """
+    medicamento = obtener_medicamento(db, medicamento_id)
+    if not medicamento:
+        return 0 # O podrías lanzar un error: raise ValueError(f"Medicamento con ID {medicamento_id} no encontrado")
+
+    total_unidades = 0
+    lotes_activos = obtener_lotes_por_medicamento(db, medicamento_id, solo_activos=True)
+
+    for lote in lotes_activos:
+        total_unidades += lote.unidades_totales_lote # Usando la property del modelo LoteStock
+    return total_unidades
+
+def calcular_fecha_vencimiento_proxima(db: Session, medicamento_id: int) -> Optional[date]:
+    """
+    Calcula la fecha de vencimiento más próxima entre los lotes activos
+    de un medicamento.
+    """
+    lotes_activos = obtener_lotes_por_medicamento(db, medicamento_id, solo_activos=True)
+
+    if not lotes_activos:
+        return None
+
+    # Los lotes ya vienen ordenados por fecha_vencimiento_lote de forma ascendente
+    # gracias a la función obtener_lotes_por_medicamento
+    return lotes_activos[0].fecha_vencimiento_lote
+
+# --- Funciones CRUD para Pedido ---
+
+def crear_pedido(db: Session, fecha_pedido: Optional[date] = None, proveedor: Optional[str] = None,
+                 estado: models.EstadoPedido = models.EstadoPedido.PENDIENTE) -> models.Pedido:
+    """
+    Crea un nuevo pedido.
+    Si fecha_pedido no se proporciona, se usará la fecha actual por defecto del modelo.
+    """
+    db_pedido = models.Pedido(
+        proveedor=proveedor,
+        estado=estado
+    )
+    if fecha_pedido: # Solo asignar si se proporciona, sino usa el default del modelo
+        db_pedido.fecha_pedido = fecha_pedido
+
+    db.add(db_pedido)
+    db.commit()
+    db.refresh(db_pedido)
+    return db_pedido
+
+def obtener_pedido(db: Session, pedido_id: int) -> Optional[models.Pedido]:
+    """
+    Obtiene un pedido por su ID, incluyendo sus detalles.
+    """
+    return db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    # Los detalles se cargarán automáticamente si se accede a pedido.detalles
+    # o se puede usar options(selectinload(models.Pedido.detalles)) para carga eager.
+
+def obtener_pedidos(db: Session, skip: int = 0, limit: int = 100) -> List[models.Pedido]:
+    """
+    Obtiene una lista de pedidos, con paginación opcional.
+    """
+    return db.query(models.Pedido).order_by(models.Pedido.fecha_pedido.desc()).offset(skip).limit(limit).all()
+
+def actualizar_pedido(db: Session, pedido_id: int, datos_actualizacion: dict) -> Optional[models.Pedido]:
+    """
+    Actualiza un pedido existente.
+    `datos_actualizacion` es un diccionario con los campos a actualizar.
+    Ej: {'proveedor': 'Farmacia Central', 'estado': models.EstadoPedido.RECIBIDO}
+    """
+    db_pedido = obtener_pedido(db, pedido_id)
+    if db_pedido:
+        for key, value in datos_actualizacion.items():
+            if hasattr(db_pedido, key):
+                # Especial manejo para el Enum si se pasa como string
+                if key == "estado" and isinstance(value, str):
+                    try:
+                        value = models.EstadoPedido[value.upper()]
+                    except KeyError:
+                        print(f"Advertencia: Valor de estado '{value}' no válido. Se ignora la actualización de estado.")
+                        continue
+                setattr(db_pedido, key, value)
+            else:
+                print(f"Advertencia: El campo '{key}' no existe en el modelo Pedido y será ignorado.")
+        db.commit()
+        db.refresh(db_pedido)
+    return db_pedido
+
+def eliminar_pedido(db: Session, pedido_id: int) -> bool:
+    """
+    Elimina un pedido por su ID.
+    Esto también eliminará los DetallesPedido asociados debido a `cascade="all, delete-orphan"`.
+    Devuelve True si la eliminación fue exitosa, False en caso contrario.
+    """
+    db_pedido = obtener_pedido(db, pedido_id)
+    if db_pedido:
+        db.delete(db_pedido)
+        db.commit()
+        return True
+    return False
+
+# --- Funciones de Utilidad/Calculadas para Pedido ---
+
+def calcular_costo_total_pedido(db: Session, pedido_id: int) -> float:
+    """
+    Calcula el costo total de un pedido sumando los subtotales de sus detalles.
+    """
+    pedido = obtener_pedido(db, pedido_id) # Esta función ya podría cargar los detalles si se configura con eager loading
+                                         # o podemos cargarlos explícitamente si es necesario.
+    if not pedido:
+        # O podrías lanzar un error: raise ValueError(f"Pedido con ID {pedido_id} no encontrado")
+        return 0.0
+
+    # Si los detalles no se cargan automáticamente (lazy loading es el default):
+    # detalles = obtener_detalles_por_pedido(db, pedido_id)
+    # Pero como Pedido tiene la relación 'detalles', SQLAlchemy los cargará al acceder.
+
+    costo_total = 0.0
+    for detalle in pedido.detalles: # Acceder a pedido.detalles cargará los detalles si no lo están ya
+        costo_total += detalle.subtotal_detalle # Usando la property del modelo DetallePedido
+    return costo_total
+
+# --- Funciones CRUD para DetallePedido ---
+
+def agregar_detalle_pedido(db: Session, pedido_id: int, medicamento_id: int, cantidad_cajas_pedidas: int,
+                           precio_unitario_compra_caja: Optional[float] = None) -> models.DetallePedido:
+    """
+    Agrega un detalle (ítem) a un pedido existente.
+    """
+    # Verificar que el pedido y el medicamento existan
+    pedido = obtener_pedido(db, pedido_id)
+    if not pedido:
+        raise ValueError(f"No se encontró el pedido con ID {pedido_id}")
+    medicamento = obtener_medicamento(db, medicamento_id)
+    if not medicamento:
+        raise ValueError(f"No se encontró el medicamento con ID {medicamento_id}")
+
+    db_detalle_pedido = models.DetallePedido(
+        pedido_id=pedido_id,
+        medicamento_id=medicamento_id,
+        cantidad_cajas_pedidas=cantidad_cajas_pedidas,
+        precio_unitario_compra_caja=precio_unitario_compra_caja
+    )
+    db.add(db_detalle_pedido)
+    db.commit()
+    db.refresh(db_detalle_pedido)
+    return db_detalle_pedido
+
+def obtener_detalle_pedido(db: Session, detalle_id: int) -> Optional[models.DetallePedido]:
+    """
+    Obtiene un detalle de pedido por su ID.
+    """
+    return db.query(models.DetallePedido).filter(models.DetallePedido.id == detalle_id).first()
+
+def obtener_detalles_por_pedido(db: Session, pedido_id: int) -> List[models.DetallePedido]:
+    """
+    Obtiene todos los detalles para un pedido específico.
+    """
+    return db.query(models.DetallePedido).filter(models.DetallePedido.pedido_id == pedido_id).all()
+
+def actualizar_detalle_pedido(db: Session, detalle_id: int, datos_actualizacion: dict) -> Optional[models.DetallePedido]:
+    """
+    Actualiza un detalle de pedido existente.
+    `datos_actualizacion` es un diccionario con los campos a actualizar.
+    """
+    db_detalle = obtener_detalle_pedido(db, detalle_id)
+    if db_detalle:
+        for key, value in datos_actualizacion.items():
+            if hasattr(db_detalle, key):
+                setattr(db_detalle, key, value)
+            else:
+                print(f"Advertencia: El campo '{key}' no existe en el modelo DetallePedido y será ignorado.")
+        db.commit()
+        db.refresh(db_detalle)
+    return db_detalle
+
+def eliminar_detalle_pedido(db: Session, detalle_id: int) -> bool:
+    """
+    Elimina un detalle de pedido por su ID.
+    Devuelve True si la eliminación fue exitosa, False en caso contrario.
+    """
+    db_detalle = obtener_detalle_pedido(db, detalle_id)
+    if db_detalle:
+        db.delete(db_detalle)
+        db.commit()
+        return True
+    return False
+
+# --- Funciones CRUD para LoteStock ---
+
+def agregar_lote_stock(db: Session, medicamento_id: int, cantidad_cajas: int, unidades_por_caja_lote: int,
+                       fecha_vencimiento_lote: date, fecha_compra_lote: Optional[date] = None,
+                       precio_compra_lote_por_caja: Optional[float] = None) -> models.LoteStock:
+    """
+    Agrega un nuevo lote de stock para un medicamento existente.
+    Si fecha_compra_lote no se proporciona, se usará la fecha actual por defecto del modelo.
+    """
+    # Verificar que el medicamento exista
+    medicamento = obtener_medicamento(db, medicamento_id)
+    if not medicamento:
+        raise ValueError(f"No se encontró el medicamento con ID {medicamento_id}")
+
+    db_lote = models.LoteStock(
+        medicamento_id=medicamento_id,
+        cantidad_cajas=cantidad_cajas,
+        unidades_por_caja_lote=unidades_por_caja_lote,
+        fecha_vencimiento_lote=fecha_vencimiento_lote,
+        precio_compra_lote_por_caja=precio_compra_lote_por_caja
+    )
+    if fecha_compra_lote: # Solo asignar si se proporciona, sino usa el default del modelo
+        db_lote.fecha_compra_lote = fecha_compra_lote
+
+    db.add(db_lote)
+    db.commit()
+    db.refresh(db_lote)
+    return db_lote
+
+def obtener_lote_stock(db: Session, lote_id: int) -> Optional[models.LoteStock]:
+    """
+    Obtiene un lote de stock por su ID.
+    """
+    return db.query(models.LoteStock).filter(models.LoteStock.id == lote_id).first()
+
+def obtener_lotes_por_medicamento(db: Session, medicamento_id: int, solo_activos: bool = False) -> List[models.LoteStock]:
+    """
+    Obtiene todos los lotes de stock para un medicamento específico.
+    Si solo_activos es True, filtra los lotes no vencidos.
+    """
+    query = db.query(models.LoteStock).filter(models.LoteStock.medicamento_id == medicamento_id)
+    if solo_activos:
+        query = query.filter(models.LoteStock.fecha_vencimiento_lote >= date.today())
+    return query.order_by(models.LoteStock.fecha_vencimiento_lote).all() # Ordenar por fecha de vencimiento
+
+def actualizar_lote_stock(db: Session, lote_id: int, datos_actualizacion: dict) -> Optional[models.LoteStock]:
+    """
+    Actualiza un lote de stock existente.
+    `datos_actualizacion` es un diccionario con los campos a actualizar.
+    """
+    db_lote = obtener_lote_stock(db, lote_id)
+    if db_lote:
+        for key, value in datos_actualizacion.items():
+            if hasattr(db_lote, key):
+                setattr(db_lote, key, value)
+            else:
+                print(f"Advertencia: El campo '{key}' no existe en el modelo LoteStock y será ignorado.")
+        db.commit()
+        db.refresh(db_lote)
+    return db_lote
+
+def eliminar_lote_stock(db: Session, lote_id: int) -> bool:
+    """
+    Elimina un lote de stock por su ID.
+    Devuelve True si la eliminación fue exitosa, False en caso contrario.
+    """
+    db_lote = obtener_lote_stock(db, lote_id)
+    if db_lote:
+        db.delete(db_lote)
+        db.commit()
+        return True
+    return False

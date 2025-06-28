@@ -1,0 +1,1 @@
+SQLAlchemy>=1.4,<2.0 # Fijamos una versión para mayor estabilidad inicial
