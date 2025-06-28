@@ -2,7 +2,9 @@
 # de la aplicación de Gestión de Medicamentos.
 
 import sys
+import os # Importar os
 from datetime import datetime, date
+from typing import Optional # Asegurar que Optional esté importado
 
 # Necesitaremos acceder a los módulos de la app
 # Esto asume que ejecutaremos main_cli.py desde el directorio raíz del repositorio,
@@ -742,16 +744,21 @@ def menu_pedidos():
 if __name__ == "__main__":
     # Pequeña validación para la creación de la base de datos la primera vez
     # Esto es para que el mensaje de creación de BD no aparezca siempre si ya existe.
-    db_path = database.DATABASE_URL.replace('sqlite:///./', '')
-    # Asumimos que si el main_cli está en gestion_medicamentos, db_path es relativo a gestion_medicamentos
-    db_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), db_path)
+    # Ahora usamos DATABASE_FILE_PATH directamente desde database.py
 
-    if not os.path.exists(db_file_path):
-        print(f"Base de datos no encontrada en {db_file_path}, inicializando...")
+    # Asegurarse de que el directorio de datos exista (aunque database.py ya lo hace,
+    # es bueno tenerlo aquí por si create_db_and_tables no se llamara explícitamente antes)
+    if not os.path.exists(database.DATA_DIR):
+        os.makedirs(database.DATA_DIR)
+        print(f"Directorio '{database.DATA_DIR}' creado.")
+
+    if not os.path.exists(database.DATABASE_FILE_PATH):
+        print(f"Base de datos no encontrada en {database.DATABASE_FILE_PATH}, inicializando...")
+        # database.create_db_and_tables() crea el directorio Y las tablas.
         database.create_db_and_tables()
     else:
         # Si la base de datos ya existe, solo nos aseguramos que las tablas estén ahí.
-        # create_all es seguro de llamar múltiples veces.
-        database.Base.metadata.create_all(bind=database.engine)
-        print(f"Usando base de datos existente: {db_file_path}")
+        # Base.metadata.create_all es seguro de llamar múltiples veces y no recreará tablas.
+        print(f"Usando base de datos existente: {database.DATABASE_FILE_PATH}")
+        database.Base.metadata.create_all(bind=database.engine) # Solo crea tablas si no existen
     main()
