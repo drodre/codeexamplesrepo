@@ -80,21 +80,191 @@ async def listar_todos_medicamentos(request: Request, db: Session = Depends(get_
         "title": "Lista de Medicamentos"
     })
 
+# --- CRUD Medicamentos ---
+# Es importante definir rutas específicas ANTES que rutas con parámetros de path que podrían coincidir.
+# Por ejemplo, /medicamentos/nuevo/ DEBE ir ANTES de /medicamentos/{medicamento_id}/
+
+@app.get("/medicamentos/nuevo/", name="crear_medicamento_form")
+async def crear_medicamento_form(request: Request):
+    return templates.TemplateResponse("form_medicamento.html", {
+        "request": request,
+        "form_title": "Añadir Nuevo Medicamento",
+        "form_action": request.url_for("crear_medicamento_submit"),
+        "medicamento": None, # No hay medicamento existente para el formulario de creación
+        "errors": None
+    })
+
+@app.post("/medicamentos/nuevo/", name="crear_medicamento_submit")
+async def crear_medicamento_submit(
+    request: Request,
+    nombre: str = Form(...),
+    marca: Optional[str] = Form(None),
+    unidades_por_caja: int = Form(...),
+    precio_por_caja_referencia: Optional[float] = Form(None),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    errors = []
+    try:
+        medicamento_data = schemas.MedicamentoCreate(
+            nombre=nombre,
+            marca=marca,
+            unidades_por_caja=unidades_por_caja,
+            precio_por_caja_referencia=precio_por_caja_referencia
+        )
+    except ValidationError as e:
+        errors = e.errors()
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request,
+            "form_title": "Añadir Nuevo Medicamento",
+            "form_action": request.url_for("crear_medicamento_submit"),
+            "medicamento": {"nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja, "precio_por_caja_referencia": precio_por_caja_referencia},
+            "errors": errors
+        }, status_code=422)
+
+    db_medicamento_existente = crud.obtener_medicamento_por_nombre(db, nombre=medicamento_data.nombre)
+    if db_medicamento_existente:
+        errors.append({"loc": ["nombre"], "msg": "Ya existe un medicamento con este nombre."})
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request,
+            "form_title": "Añadir Nuevo Medicamento",
+            "form_action": request.url_for("crear_medicamento_submit"),
+            "medicamento": medicamento_data.dict(),
+            "errors": errors
+        }, status_code=400)
+
+    try:
+        crud.crear_medicamento(db=db, nombre=medicamento_data.nombre, marca=medicamento_data.marca,
+                                             unidades_por_caja=medicamento_data.unidades_por_caja,
+                                             precio_referencia=medicamento_data.precio_por_caja_referencia)
+        return RedirectResponse(url=request.url_for("listar_todos_medicamentos"), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al guardar el medicamento: {e}"})
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request,
+            "form_title": "Añadir Nuevo Medicamento",
+            "form_action": request.url_for("crear_medicamento_submit"),
+            "medicamento": medicamento_data.dict(),
+            "errors": errors
+        }, status_code=500)
+
+@app.get("/medicamentos/{medicamento_id}/editar/", name="editar_medicamento_form")
+async def editar_medicamento_form(request: Request, medicamento_id: int, db: Session = Depends(get_db_session_fastapi)):
+    medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
+    if not medicamento:
+        raise HTTPException(status_code=404, detail=f"Medicamento con ID {medicamento_id} no encontrado")
+
+    return templates.TemplateResponse("form_medicamento.html", {
+        "request": request,
+        "form_title": f"Editar Medicamento: {medicamento.nombre}",
+        "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
+        "medicamento": medicamento,
+        "errors": None
+    })
+
+@app.post("/medicamentos/{medicamento_id}/editar/", name="editar_medicamento_submit")
+async def editar_medicamento_submit(
+    request: Request,
+    medicamento_id: int,
+    nombre: str = Form(...),
+    marca: Optional[str] = Form(None),
+    unidades_por_caja: int = Form(...),
+    precio_por_caja_referencia: Optional[float] = Form(None),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    errors = []
+    medicamento_original = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
+    if not medicamento_original:
+        raise HTTPException(status_code=404, detail=f"Medicamento con ID {medicamento_id} no encontrado para actualizar")
+
+    try:
+        medicamento_data_update = schemas.MedicamentoUpdate(
+            nombre=nombre,
+            marca=marca,
+            unidades_por_caja=unidades_por_caja,
+            precio_por_caja_referencia=precio_por_caja_referencia
+        )
+    except ValidationError as e:
+        errors = e.errors()
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request,
+            "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
+            "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
+            "medicamento": {"id": medicamento_id, "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja, "precio_por_caja_referencia": precio_por_caja_referencia},
+            "errors": errors
+        }, status_code=422)
+
+    if medicamento_data_update.nombre and medicamento_data_update.nombre.lower() != medicamento_original.nombre.lower():
+        db_medicamento_existente = crud.obtener_medicamento_por_nombre(db, nombre=medicamento_data_update.nombre)
+        if db_medicamento_existente and db_medicamento_existente.id != medicamento_id:
+            errors.append({"loc": ["nombre"], "msg": "Ya existe otro medicamento con este nombre."})
+            return templates.TemplateResponse("form_medicamento.html", {
+                "request": request,
+                "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
+                "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
+                "medicamento": {"id": medicamento_id, **medicamento_data_update.dict(exclude_unset=True)},
+                "errors": errors
+            }, status_code=400)
+
+    try:
+        update_data_dict = medicamento_data_update.dict(exclude_unset=True)
+        if marca == "":
+            update_data_dict['marca'] = None
+        if precio_por_caja_referencia is None and 'precio_por_caja_referencia' in update_data_dict :
+             pass
+        elif 'precio_por_caja_referencia' not in update_data_dict and precio_por_caja_referencia is None and medicamento_original.precio_por_caja_referencia is not None:
+            update_data_dict['precio_por_caja_referencia'] = None
+
+        if not update_data_dict:
+             return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+
+        crud.actualizar_medicamento(db, medicamento_id=medicamento_id, datos_actualizacion=update_data_dict)
+        return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al actualizar el medicamento: {e}"})
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request,
+            "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
+            "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
+            "medicamento": {"id": medicamento_id, **medicamento_data_update.dict(exclude_unset=True)},
+            "errors": errors
+        }, status_code=500)
+
+@app.get("/medicamentos/{medicamento_id}/eliminar/", name="eliminar_medicamento_confirm_form")
+async def eliminar_medicamento_confirm_form(request: Request, medicamento_id: int, db: Session = Depends(get_db_session_fastapi)):
+    medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
+    if not medicamento:
+        raise HTTPException(status_code=404, detail=f"Medicamento con ID {medicamento_id} no encontrado")
+
+    return templates.TemplateResponse("confirmar_eliminacion_medicamento.html", {
+        "request": request,
+        "medicamento": medicamento,
+        "title": f"Confirmar Eliminación: {medicamento.nombre}"
+    })
+
+@app.post("/medicamentos/{medicamento_id}/eliminar/", name="eliminar_medicamento_submit")
+async def eliminar_medicamento_submit(request: Request, medicamento_id: int, db: Session = Depends(get_db_session_fastapi)):
+    medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
+    if not medicamento:
+        raise HTTPException(status_code=404, detail=f"Medicamento con ID {medicamento_id} no encontrado para eliminar")
+
+    try:
+        crud.eliminar_medicamento(db, medicamento_id=medicamento_id)
+        return RedirectResponse(url=request.url_for("listar_todos_medicamentos"), status_code=303)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar el medicamento: {e}")
+
+# Esta es la ruta que causaba el problema, la movemos después de las de CRUD
 @app.get("/medicamentos/{medicamento_id}/", name="detalle_medicamento")
 async def detalle_medicamento(request: Request, medicamento_id: int, db: Session = Depends(get_db_session_fastapi)):
     medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
     if not medicamento:
-        # Idealmente, aquí se mostraría una página de error 404.
-        # Por ahora, una simple respuesta o redirigir.
-        # O podríamos pasar None a la plantilla y que ella maneje el "no encontrado".
         return templates.TemplateResponse("error_404.html", {"request": request, "detail": f"Medicamento con ID {medicamento_id} no encontrado"}, status_code=404)
 
-    lotes = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False) # Mostrar todos los lotes
+    lotes = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False)
     stock_total = crud.calcular_stock_total_unidades(db, medicamento_id=medicamento_id)
     vencimiento_proximo = crud.calcular_fecha_vencimiento_proxima(db, medicamento_id=medicamento_id)
 
-    # Para la columna "Activo" en la tabla de lotes, necesitamos la fecha de hoy en la plantilla.
-    from datetime import date as py_date # Renombrar para evitar conflicto con models.Date
+    from datetime import date as py_date
 
     return templates.TemplateResponse("detalle_medicamento.html", {
         "request": request,
@@ -102,7 +272,7 @@ async def detalle_medicamento(request: Request, medicamento_id: int, db: Session
         "lotes": lotes,
         "stock_total": stock_total,
         "vencimiento_proximo": vencimiento_proximo,
-        "today_date": py_date.today(), # Pasar la fecha de hoy a la plantilla
+        "today_date": py_date.today(),
         "title": f"Detalle: {medicamento.nombre}"
     })
 
