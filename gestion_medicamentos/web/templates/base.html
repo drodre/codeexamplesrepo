@@ -27,10 +27,9 @@
         <h1>Gestor de Medicamentos Caseros</h1>
         <nav>
             <ul>
-                <li><a href="/">Inicio</a></li>
-                <li><a href="/medicamentos/">Medicamentos</a></li>
-                {# <li><a href="/pedidos/">Pedidos</a></li> #}
-                {# Añadir más enlaces de navegación aquí cuando las rutas existan y se llamen así #}
+                <li><a href="{{ url_for('root') }}">Inicio</a></li>
+                <li><a href="{{ url_for('listar_todos_medicamentos') }}">Medicamentos</a></li>
+                <li><a href="{{ url_for('listar_todos_pedidos') }}">Pedidos</a></li>
             </ul>
         </nav>
     </header>

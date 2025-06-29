@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Pedidos - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Listado de Pedidos</h2>
+
+{% if pedidos_info %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID Pedido</th>
+                <th>Fecha Pedido</th>
+                <th>Proveedor</th>
+                <th>Estado</th>
+                <th>Costo Total</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for info in pedidos_info %}
+            <tr>
+                <td>{{ info.pedido.id }}</td>
+                <td>{{ info.pedido.fecha_pedido.strftime('%d/%m/%Y') }}</td>
+                <td>{{ info.pedido.proveedor if info.pedido.proveedor else 'N/A' }}</td>
+                <td>{{ info.pedido.estado.value }}</td>
+                <td>{{ "%.2f" | format(info.costo_total) }}</td>
+                <td>
+                    <a href="/pedidos/{{ info.pedido.id }}/">Ver Detalles</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No hay pedidos registrados en la base de datos.</p>
+{% endif %}
+
+{# <p><a href="/pedidos/nuevo/">Crear Nuevo Pedido</a> (Funcionalidad futura)</p> #}
+{% endblock %}

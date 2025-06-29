@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Pedido #{{ pedido.id }} - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Detalle del Pedido #{{ pedido.id }}</h2>
+
+<p><strong>ID Pedido:</strong> {{ pedido.id }}</p>
+<p><strong>Fecha del Pedido:</strong> {{ pedido.fecha_pedido.strftime('%d/%m/%Y') }}</p>
+<p><strong>Proveedor:</strong> {{ pedido.proveedor if pedido.proveedor else 'N/A' }}</p>
+<p><strong>Estado:</strong> {{ pedido.estado.value }}</p>
+<p><strong>Costo Total Calculado:</strong> {{ "%.2f" | format(costo_total) }}</p>
+
+<h3>Ítems del Pedido</h3>
+{% if detalles_pedido %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID Detalle</th>
+                <th>Medicamento (ID)</th>
+                <th>Nombre Medicamento</th>
+                <th>Cajas Pedidas</th>
+                <th>Precio Unitario/Caja</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in detalles_pedido %}
+            <tr>
+                <td>{{ detalle.id }}</td>
+                <td>{{ detalle.medicamento_id }}</td>
+                <td>{{ detalle.medicamento.nombre if detalle.medicamento else 'Desconocido' }}</td> {# Asume que el objeto medicamento está cargado o se carga aquí #}
+                <td>{{ detalle.cantidad_cajas_pedidas }}</td>
+                <td>{{ "%.2f" | format(detalle.precio_unitario_compra_caja) if detalle.precio_unitario_compra_caja is not none else 'N/A' }}</td>
+                <td>{{ "%.2f" | format(detalle.subtotal_detalle) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>Este pedido no tiene ítems registrados.</p>
+{% endif %}
+
+<p style="margin-top: 20px;"><a href="{{ url_for('listar_todos_pedidos') }}">Volver a la lista de pedidos</a></p>
+{% endblock %}
