@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Error 404 - No Encontrado{% endblock %}
+
+{% block content %}
+<h2>Error 404 - Recurso No Encontrado</h2>
+<p>Lo sentimos, el recurso que estás buscando no pudo ser encontrado.</p>
+{% if detail %}
+<p>Detalle: {{ detail }}</p>
+{% endif %}
+<p><a href="{{ url_for('root') }}">Volver a la página de inicio</a></p>
+{% endblock %}

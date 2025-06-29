@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle: {{ medicamento.nombre }} - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Detalle del Medicamento: {{ medicamento.nombre }}</h2>
+
+<p><strong>ID:</strong> {{ medicamento.id }}</p>
+<p><strong>Nombre:</strong> {{ medicamento.nombre }}</p>
+<p><strong>Marca:</strong> {{ medicamento.marca if medicamento.marca else 'N/A' }}</p>
+<p><strong>Unidades por Caja:</strong> {{ medicamento.unidades_por_caja }}</p>
+<p><strong>Precio de Referencia por Caja:</strong> {{ medicamento.precio_por_caja_referencia if medicamento.precio_por_caja_referencia is not none else 'N/A' }}</p>
+
+<h3>Stock y Vencimiento</h3>
+<p><strong>Stock Total (Unidades Activas):</strong> {{ stock_total }}</p>
+<p><strong>Fecha de Vencimiento Próxima (Lotes Activos):</strong> {{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A' }}</p>
+
+<h3>Lotes de Stock</h3>
+{% if lotes %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID Lote</th>
+                <th>Cantidad de Cajas</th>
+                <th>Unidades/Caja (Lote)</th>
+                <th>Total Unidades (Lote)</th>
+                <th>Fecha de Compra</th>
+                <th>Fecha de Vencimiento</th>
+                <th>Precio Compra/Caja (Lote)</th>
+                <th>Activo (No Vencido)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lote in lotes %}
+            <tr>
+                <td>{{ lote.id }}</td>
+                <td>{{ lote.cantidad_cajas }}</td>
+                <td>{{ lote.unidades_por_caja_lote }}</td>
+                <td>{{ lote.unidades_totales_lote }}</td>
+                <td>{{ lote.fecha_compra_lote.strftime('%d/%m/%Y') }}</td>
+                <td>{{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}</td>
+                <td>{{ lote.precio_compra_lote_por_caja if lote.precio_compra_lote_por_caja is not none else 'N/A' }}</td>
+                <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No hay lotes de stock registrados para este medicamento.</p>
+{% endif %}
+
+<p style="margin-top: 20px;"><a href="{{ url_for('listar_todos_medicamentos') }}">Volver a la lista de medicamentos</a></p>
+{% endblock %}
