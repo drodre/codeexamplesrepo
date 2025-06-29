@@ -49,5 +49,10 @@
     <p>No hay lotes de stock registrados para este medicamento.</p>
 {% endif %}
 
+<div style="margin-top: 30px;">
+    <a href="{{ url_for('editar_medicamento_form', medicamento_id=medicamento.id) }}" style="background-color: #f0ad4e; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin-right: 10px;">Editar Medicamento</a>
+    <a href="{{ url_for('eliminar_medicamento_confirm_form', medicamento_id=medicamento.id) }}" style="background-color: #d9534f; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Eliminar Medicamento</a>
+</div>
+
 <p style="margin-top: 20px;"><a href="{{ url_for('listar_todos_medicamentos') }}">Volver a la lista de medicamentos</a></p>
 {% endblock %}
