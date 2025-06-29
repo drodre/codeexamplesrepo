@@ -1,1 +1,4 @@
 SQLAlchemy>=1.4,<2.0 # Fijamos una versión para mayor estabilidad inicial
+fastapi>=0.70.0,<0.112.0 # Framework web rápido
+uvicorn[standard]>=0.15.0,<0.30.0 # Servidor ASGI para FastAPI (standard incluye mejoras)
+Jinja2>=3.0.0,<4.0.0 # Motor de plantillas para HTML

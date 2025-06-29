@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Medicamentos - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Listado de Medicamentos</h2>
+
+{% if medicamentos %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Marca</th>
+                <th>Unidades/Caja</th>
+                <th>Stock Total (Unidades Activas)</th>
+                <th>Vencimiento Próximo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for med_info in medicamentos_info %}
+            <tr>
+                <td>{{ med_info.medicamento.id }}</td>
+                <td>{{ med_info.medicamento.nombre }}</td>
+                <td>{{ med_info.medicamento.marca if med_info.medicamento.marca else 'N/A' }}</td>
+                <td>{{ med_info.medicamento.unidades_por_caja }}</td>
+                <td>{{ med_info.stock_total }}</td>
+                <td>{{ med_info.vencimiento_proximo.strftime('%d/%m/%Y') if med_info.vencimiento_proximo else 'N/A' }}</td>
+                <td>
+                    <a href="/medicamentos/{{ med_info.medicamento.id }}/">Ver Detalles</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No hay medicamentos registrados en la base de datos.</p>
+{% endif %}
+
+{# <p><a href="/medicamentos/nuevo/">Añadir Nuevo Medicamento</a> (Funcionalidad futura)</p> #}
+{% endblock %}
