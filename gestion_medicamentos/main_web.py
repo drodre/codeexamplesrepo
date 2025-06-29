@@ -56,6 +56,9 @@ async def listar_todos_medicamentos(request: Request, db: Session = Depends(get_
     medicamentos = crud.obtener_medicamentos(db, limit=1000) # Obtener todos los medicamentos
 
     medicamentos_info = []
+    # if not medicamentos: # El log ya no es necesario aquí
+    #     print("[DEBUG] La lista de medicamentos está vacía.")
+
     for med in medicamentos:
         stock_total = crud.calcular_stock_total_unidades(db, med.id)
         vencimiento_proximo = crud.calcular_fecha_vencimiento_proxima(db, med.id)
@@ -95,6 +98,47 @@ async def detalle_medicamento(request: Request, medicamento_id: int, db: Session
         "vencimiento_proximo": vencimiento_proximo,
         "today_date": py_date.today(), # Pasar la fecha de hoy a la plantilla
         "title": f"Detalle: {medicamento.nombre}"
+    })
+
+@app.get("/pedidos/", name="listar_todos_pedidos")
+async def listar_todos_pedidos(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    pedidos = crud.obtener_pedidos(db, limit=1000)
+
+    pedidos_info = []
+    for p in pedidos:
+        costo_total = crud.calcular_costo_total_pedido(db, p.id)
+        pedidos_info.append({
+            "pedido": p,
+            "costo_total": costo_total
+        })
+
+    return templates.TemplateResponse("lista_pedidos.html", {
+        "request": request,
+        "pedidos_info": pedidos_info,
+        "title": "Lista de Pedidos"
+    })
+
+@app.get("/pedidos/{pedido_id}/", name="detalle_pedido")
+async def detalle_pedido_ruta(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido:
+        return templates.TemplateResponse("error_404.html", {"request": request, "detail": f"Pedido con ID {pedido_id} no encontrado"}, status_code=404)
+
+    detalles_pedido = crud.obtener_detalles_por_pedido(db, pedido_id=pedido_id)
+    costo_total = crud.calcular_costo_total_pedido(db, pedido_id=pedido_id) # Ya se calcula en la plantilla, pero útil tenerlo aquí
+
+    # Para mostrar el nombre del medicamento en los detalles del pedido,
+    # nos aseguramos de que el objeto medicamento esté accesible.
+    # crud.obtener_detalles_por_pedido ya debería cargar la relación si está configurada con eager loading,
+    # o se accederá por lazy loading en la plantilla. Si no, tendríamos que cargarlo explícitamente.
+    # La plantilla actual accede a detalle.medicamento.nombre, lo que implica que la relación funciona.
+
+    return templates.TemplateResponse("detalle_pedido.html", {
+        "request": request,
+        "pedido": pedido,
+        "detalles_pedido": detalles_pedido,
+        "costo_total": costo_total,
+        "title": f"Detalle Pedido #{pedido.id}"
     })
 
 # Aquí se añadirán más rutas.
