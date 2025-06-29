@@ -56,8 +56,8 @@ def main():
         print("\n╔══════════════════════════════════╗")
         print("║        MENÚ PRINCIPAL            ║")
         print("╠══════════════════════════════════╣")
-        print("1. Gestionar Medicamentos")
-        print("2. Gestionar Stock (Lotes)")
+        # print("1. Gestionar Medicamentos") # Línea duplicada eliminada
+        # print("2. Gestionar Stock (Lotes)") # Línea duplicada eliminada
         print("║ 1. Gestionar Medicamentos        ║")
         print("║ 2. Gestionar Stock (Lotes)       ║")
         print("║ 3. Gestionar Pedidos             ║")
