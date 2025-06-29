@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar Eliminación - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Confirmar Eliminación de Medicamento</h2>
+
+{% if medicamento %}
+    <p>¿Está seguro de que desea eliminar el siguiente medicamento?</p>
+    <p><strong>ID:</strong> {{ medicamento.id }}</p>
+    <p><strong>Nombre:</strong> {{ medicamento.nombre }}</p>
+    <p><strong>Marca:</strong> {{ medicamento.marca if medicamento.marca else 'N/A' }}</p>
+    <p style="color: red; font-weight: bold;">Esta acción no se puede deshacer y también eliminará todos los lotes de stock asociados a este medicamento y cualquier referencia en pedidos.</p>
+
+    <form method="post" action="{{ url_for('eliminar_medicamento_submit', medicamento_id=medicamento.id) }}" style="margin-top: 20px;">
+        <button type="submit" style="background-color: #d9534f; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px;">Sí, Eliminar Definitivamente</button>
+        <a href="{{ url_for('detalle_medicamento', medicamento_id=medicamento.id) }}" style="margin-left: 10px; text-decoration: none; background-color: #ccc; color: #333; padding: 10px 15px; border-radius: 4px;">Cancelar</a>
+    </form>
+{% else %}
+    <p>No se ha especificado un medicamento para eliminar o no se encontró.</p>
+    <p><a href="{{ url_for('listar_todos_medicamentos') }}">Volver a la lista de medicamentos</a></p>
+{% endif %}
+
+{% endblock %}
