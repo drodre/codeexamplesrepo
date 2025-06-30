@@ -5,42 +5,68 @@
 {% block content %}
 <h2>Listado de Medicamentos</h2>
 
-{% if medicamentos_info %} {# <--- Cambio aquí: de 'medicamentos' a 'medicamentos_info' #}
+<div class="mb-3">
+    <a href="{{ url_for('crear_medicamento_form') }}" class="btn btn-success">Añadir Nuevo Medicamento</a>
+</div>
+
+{% if medicamentos_info %}
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Marca</th>
-                <th>Unidades/Caja</th>
-                <th>Stock Total (Unidades Activas)</th>
-                <th>Vencimiento Próximo</th>
-                <th>Acciones</th>
+                <th scope="col">ID</th>
+                <th scope="col">Nombre</th>
+                <th scope="col">Marca</th>
+                <th scope="col">Unidades/Caja</th>
+                <th scope="col">Precio Ref./Caja</th>
+                <th scope="col">Stock Total (Unidades Activas)</th>
+                <th scope="col">Vencimiento Próximo</th>
+                <th scope="col">Estado Vencimiento</th>
+                <th scope="col">Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for med_info in medicamentos_info %}
-            <tr>
-                <td>{{ med_info.medicamento.id }}</td>
-                <td>{{ med_info.medicamento.nombre }}</td>
-                <td>{{ med_info.medicamento.marca if med_info.medicamento.marca else 'N/A' }}</td>
-                <td>{{ med_info.medicamento.unidades_por_caja }}</td>
-                <td>{{ med_info.stock_total }}</td>
-                <td>{{ med_info.vencimiento_proximo.strftime('%d/%m/%Y') if med_info.vencimiento_proximo else 'N/A' }}</td>
-                <td>
-                    <a href="{{ url_for('detalle_medicamento', medicamento_id=med_info.medicamento.id) }}">Ver Detalles</a> |
-                    <a href="{{ url_for('editar_medicamento_form', medicamento_id=med_info.medicamento.id) }}">Editar</a> |
-                    <a href="{{ url_for('eliminar_medicamento_confirm_form', medicamento_id=med_info.medicamento.id) }}">Eliminar</a>
+            {% set vencimiento_proximo = med_info.vencimiento_proximo %}
+            {% set hoy = py_date.today() %}
+            {% set estado_vencimiento_class = '' %}
+            {% set estado_vencimiento_texto = 'OK' %}
+            {% if vencimiento_proximo %}
+                {% set dias_para_vencer = (vencimiento_proximo - hoy).days %}
+                {% if dias_para_vencer < 0 %}
+                    {% set estado_vencimiento_class = 'row-expired' %}
+                    {% set estado_vencimiento_texto = 'Vencido' %}
+                {% elif dias_para_vencer <= 30 %}
+                    {% set estado_vencimiento_class = 'row-warning' %}
+                    {% set estado_vencimiento_texto = 'Próximo (' ~ dias_para_vencer ~ ' días)' %}
+                {% endif %}
+            {% else %}
+                 {% set estado_vencimiento_texto = 'N/A (sin lotes)' %}
+            {% endif %}
+
+            <tr class="{{ estado_vencimiento_class }}">
+                <td data-label="ID">{{ med_info.medicamento.id }}</td>
+                <td data-label="Nombre">{{ med_info.medicamento.nombre }}</td>
+                <td data-label="Marca">{{ med_info.medicamento.marca if med_info.medicamento.marca else 'N/A' }}</td>
+                <td data-label="Unidades/Caja" class="text-center">{{ med_info.medicamento.unidades_por_caja }}</td>
+                <td data-label="Precio Ref./Caja" class="text-right">{{ "%.2f €"|format(med_info.medicamento.precio_por_caja_referencia) if med_info.medicamento.precio_por_caja_referencia is not none else 'N/A' }}</td>
+                <td data-label="Stock Total" class="text-center">{{ med_info.stock_total }}</td>
+                <td data-label="Vencimiento Próximo">{{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A' }}</td>
+                <td data-label="Estado Vencimiento">
+                    <span class="{{ 'status-expired' if estado_vencimiento_texto == 'Vencido' else ('status-warning' if 'Próximo' in estado_vencimiento_texto else 'status-ok') }}">
+                        {{ estado_vencimiento_texto }}
+                    </span>
+                </td>
+                <td data-label="Acciones">
+                    <a href="{{ url_for('detalle_medicamento', medicamento_id=med_info.medicamento.id) }}" class="btn btn-sm btn-info">Ver</a>
+                    <a href="{{ url_for('editar_medicamento_form', medicamento_id=med_info.medicamento.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                    <a href="{{ url_for('eliminar_medicamento_confirm_form', medicamento_id=med_info.medicamento.id) }}" class="btn btn-sm btn-danger">Eliminar</a>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 {% else %}
-    <p>No hay medicamentos registrados en la base de datos.</p>
+    <div class="alert alert-info">No hay medicamentos registrados en la base de datos.</div>
 {% endif %}
 
-<p style="margin-top: 20px;">
-    <a href="{{ url_for('crear_medicamento_form') }}" style="background-color: #5cb85c; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Añadir Nuevo Medicamento</a>
-</p>
 {% endblock %}

@@ -5,8 +5,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func, and_
 from . import models # models.py en el mismo directorio
-from datetime import date
-from typing import List, Optional, Type # Para type hints
+from datetime import date as py_date, timedelta # Renombrado para evitar conflicto y añadido timedelta
+from typing import List, Optional, Type, Dict, Any # Para type hints
 
 # Más adelante añadiremos aquí las funciones CRUD específicas.
 
@@ -362,6 +362,74 @@ def obtener_lotes_por_medicamento(db: Session, medicamento_id: int, solo_activos
     if solo_activos:
         query = query.filter(models.LoteStock.fecha_vencimiento_lote >= date.today())
     return query.order_by(models.LoteStock.fecha_vencimiento_lote).all() # Ordenar por fecha de vencimiento
+
+
+# --- Funciones para el Dashboard ---
+
+def contar_total_medicamentos(db: Session) -> int:
+    """Cuenta el número total de medicamentos distintos registrados."""
+    return db.query(func.count(models.Medicamento.id.distinct())).scalar()
+
+def contar_medicamentos_proximos_a_vencer(db: Session, dias_limite: int) -> int:
+    """
+    Cuenta el número de medicamentos distintos que tienen al menos un lote activo
+    cuya fecha de vencimiento está dentro de los próximos `dias_limite`.
+    Un lote está activo si su fecha de vencimiento es hoy o en el futuro.
+    """
+    fecha_referencia = py_date.today() + timedelta(days=dias_limite)
+    hoy = py_date.today()
+
+    # Subconsulta para obtener los medicamento_id de los lotes que cumplen la condición
+    subquery = db.query(models.LoteStock.medicamento_id)\
+        .filter(models.LoteStock.fecha_vencimiento_lote >= hoy)\
+        .filter(models.LoteStock.fecha_vencimiento_lote <= fecha_referencia)\
+        .distinct()\
+        .subquery()
+
+    # Contar cuántos medicamentos distintos tienen lotes en esa condición
+    count = db.query(func.count(subquery.c.medicamento_id)).scalar()
+    return count
+
+def contar_lotes_vencidos_no_eliminados(db: Session) -> int:
+    """
+    Cuenta el número total de lotes individuales que ya han vencido.
+    Asume que "no eliminados" significa que simplemente existen en la tabla LoteStock.
+    """
+    hoy = py_date.today()
+    return db.query(models.LoteStock)\
+        .filter(models.LoteStock.fecha_vencimiento_lote < hoy)\
+        .count()
+
+def contar_medicamentos_stock_bajo(db: Session, umbral_unidades: int) -> int:
+    """
+    Cuenta el número de medicamentos distintos cuyo stock total de unidades activas
+    es menor o igual al `umbral_unidades`.
+    El stock activo se calcula sumando unidades de lotes no vencidos.
+    """
+    hoy = py_date.today()
+
+    # Subconsulta para calcular el stock total activo por medicamento
+    # (cantidad_cajas * unidades_por_caja_lote)
+    subquery_stock_activo = db.query(
+            models.LoteStock.medicamento_id,
+            func.sum(models.LoteStock.cantidad_cajas * models.LoteStock.unidades_por_caja_lote).label("stock_activo_total")
+        )\
+        .filter(models.LoteStock.fecha_vencimiento_lote >= hoy)\
+        .group_by(models.LoteStock.medicamento_id)\
+        .subquery()
+
+    # Contar medicamentos cuyo stock (considerando 0 si no hay lotes activos o el medicamento no tiene lotes)
+    # es <= umbral. Usamos un LEFT JOIN para incluir medicamentos sin lotes activos (stock 0).
+    # COALESCE se usa para tratar los NULL (medicamentos sin lotes activos) como 0.
+    count = db.query(models.Medicamento.id)\
+        .outerjoin(subquery_stock_activo, models.Medicamento.id == subquery_stock_activo.c.medicamento_id)\
+        .filter(func.coalesce(subquery_stock_activo.c.stock_activo_total, 0) <= umbral_unidades)\
+        .count()
+
+    return count
+
+# --- Fin Funciones para el Dashboard ---
+
 
 def actualizar_lote_stock(db: Session, lote_id: int, datos_actualizacion: dict) -> Optional[models.LoteStock]:
     """

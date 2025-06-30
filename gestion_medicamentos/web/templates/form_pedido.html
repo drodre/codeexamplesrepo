@@ -5,60 +5,89 @@
 {% block content %}
 <h2>{{ form_title }}</h2>
 
-<form method="post" action="{{ form_action }}">
-    <div>
-        <label for="fecha_pedido">Fecha del Pedido (YYYY-MM-DD):</label>
-        {# El input de tipo 'date' usualmente espera YYYY-MM-DD para el valor #}
-        <input type="date" id="fecha_pedido" name="fecha_pedido"
-               value="{{ pedido.fecha_pedido.strftime('%Y-%m-%d') if pedido and pedido.fecha_pedido else today_date_iso }}"
-               required>
-        <small>Si se deja vacío, se usará la fecha actual al guardar (para creación).</small>
-    </div>
-
-    <div style="margin-top: 10px;">
-        <label for="proveedor">Proveedor (Opcional):</label>
-        <input type="text" id="proveedor" name="proveedor"
-               value="{{ pedido.proveedor if pedido and pedido.proveedor is not none else '' }}">
-    </div>
-
-    <div style="margin-top: 10px;">
-        <label for="estado">Estado del Pedido:</label>
-        <select id="estado" name="estado" required>
-            {% for estado_val in estados_posibles %}
-            <option value="{{ estado_val.name }}" {% if pedido and pedido.estado and pedido.estado.name == estado_val.name %}selected{% elif not pedido and estado_val.name == 'PENDIENTE' %}selected{% endif %}>
-                {{ estado_val.value }}
-            </option>
-            {% endfor %}
-        </select>
-    </div>
-
-    {# Aquí no se gestionan los ítems del pedido en este paso del plan #}
-    {# En una fase posterior, se podría añadir una sección para ítems #}
-
-    <div style="margin-top: 20px;">
-        <button type="submit">Guardar Pedido</button>
-        <a href="{{ url_for('listar_todos_pedidos') }}" style="margin-left: 10px;">Cancelar</a>
-    </div>
-</form>
-
 {% if errors %}
-    <div style="margin-top: 20px; color: red;">
-        <h4>Errores de validación:</h4>
+    <div class="alert alert-danger">
+        <strong>Error(es) en el formulario:</strong>
         <ul>
             {% for error in errors %}
-                <li>
-                    {% if error.loc|length > 1 %}
-                        {{ error.loc[1] }}
-                    {% elif error.loc %}
-                        {{ error.loc[0] }}
+                 <li>
+                    {% if error.loc and error.loc|length > 1 %}
+                        En campo '{{ error.loc[1] }}': {{ error.msg }}
+                    {% elif error.loc and error.loc|length == 1 %}
+                         En campo '{{ error.loc[0] }}': {{ error.msg }}
+                    {% elif error.msg %}
+                        {{ error.msg }}
                     {% else %}
-                        General
+                        Error desconocido.
                     {% endif %}
-                    : {{ error.msg }}
                 </li>
             {% endfor %}
         </ul>
     </div>
 {% endif %}
+
+<form method="POST" action="{{ form_action }}">
+    {% set req_form = request.form if request and request.form else {} %}
+
+    {# Priorizar datos de 'pedido' (que puede ser el objeto de BD o el diccionario de repopulación con errores) #}
+    {# Para fechas: si 'pedido' tiene el string (ej. pedido.fecha_pedido_str_form), usarlo. Sino, el objeto fecha. Sino, el form. Sino, el default. #}
+    {% set val_fecha_pedido = '' %}
+    {% if pedido and pedido.get('fecha_pedido_str_form') %} {# Errores de validación, 'pedido' es el dict de repopulación #}
+        {% set val_fecha_pedido = pedido.fecha_pedido_str_form %}
+    {% elif pedido and pedido.fecha_pedido and hasattr(pedido.fecha_pedido, 'isoformat') %} {# Edición, 'pedido' es el objeto SQLAlchemy #}
+        {% set val_fecha_pedido = pedido.fecha_pedido.isoformat() %}
+    {% else %} {# Creación o request.form si disponible #}
+        {% set val_fecha_pedido = req_form.get('fecha_pedido', today_date_iso) %}
+    {% endif %}
+
+    {% set val_proveedor = '' %}
+    {% if pedido and pedido.get('proveedor') is not none %} {# Errores de validación #}
+         {% set val_proveedor = pedido.get('proveedor') %}
+    {% elif pedido and pedido.proveedor is not none %} {# Edición #}
+         {% set val_proveedor = pedido.proveedor %}
+    {% else %} {# Creación o request.form #}
+         {% set val_proveedor = req_form.get('proveedor', '') %}
+    {% endif %}
+
+    {% set val_estado = '' %}
+    {% if pedido and pedido.get('estado_str_form') %} {# Errores de validación #}
+        {% set val_estado = pedido.get('estado_str_form') %}
+    {% elif pedido and pedido.estado and hasattr(pedido.estado, 'name') %} {# Edición #}
+        {% set val_estado = pedido.estado.name %}
+    {% else %} {# Creación o request.form #}
+        {% set val_estado = req_form.get('estado', 'PENDIENTE') %}
+    {% endif %}
+
+
+    <div class="form-group mb-3">
+        <label for="fecha_pedido">Fecha del Pedido (YYYY-MM-DD):</label>
+        <input type="date" id="fecha_pedido" name="fecha_pedido" class="form-control"
+               value="{{ val_fecha_pedido }}" required>
+    </div>
+    <div class="form-group mb-3">
+        <label for="proveedor">Proveedor (Opcional):</label>
+        <input type="text" id="proveedor" name="proveedor" class="form-control"
+               value="{{ val_proveedor }}">
+    </div>
+    <div class="form-group mb-3">
+        <label for="estado">Estado del Pedido:</label>
+        <select id="estado" name="estado" class="form-control">
+            {% for estado_enum in estados_posibles %}
+                <option value="{{ estado_enum.name }}"
+                        {{ 'selected' if val_estado == estado_enum.name else '' }}>
+                    {{ estado_enum.value }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">Guardar Pedido</button>
+        <a href="{{ url_for('listar_todos_pedidos') if not (pedido and pedido.id) else url_for('detalle_pedido_ruta', pedido_id=pedido.id) }}"
+           class="btn btn-secondary">
+           Cancelar
+        </a>
+    </div>
+</form>
 
 {% endblock %}

@@ -5,83 +5,74 @@
 {% block content %}
 <h2>{{ title }}</h2>
 
-<form method="get" action="{{ url_for('reporte_costos_mensuales') }}">
-    <div style="margin-bottom: 20px;">
-        <label for="anio_select">Año:</label>
-        <select id="anio_select" name="anio">
-            <option value="">Seleccione un año...</option>
-            {# Crear una lista única de años disponibles #}
-            {% set anios_unicos = [] %}
-            {% for m_d in meses_disponibles %}
-                {% if m_d.anio not in anios_unicos %}
-                    {% set _ = anios_unicos.append(m_d.anio) %}
-                {% endif %}
-            {% endfor %}
-            {% for anio_disp in anios_unicos|sort(reverse=True) %}
-            <option value="{{ anio_disp }}" {% if anio_disp == anio_seleccionado %}selected{% endif %}>
-                {{ anio_disp }}
-            </option>
-            {% endfor %}
-        </select>
-
-        <label for="mes_select" style="margin-left: 10px;">Mes:</label>
-        <select id="mes_select" name="mes">
-            <option value="">Seleccione un mes...</option>
-            {% for i in range(1, 13) %}
-            <option value="{{ i }}" {% if i == mes_seleccionado %}selected{% endif %}>
-                {{ '%02d' % i }} - {{ py_date(2000, i, 1).strftime('%B').capitalize() }} {# Nombre del mes, usando py_date global #}
-            </option>
-            {% endfor %}
-        </select>
-        <button type="submit" style="margin-left: 10px;">Generar Reporte</button>
+<form method="get" action="{{ url_for('reporte_costos_mensuales') }}" class="mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label for="mes" class="form-label">Mes:</label>
+            <select name="mes" id="mes" class="form-select">
+                <option value="">-- Todos los Meses --</option> {# Cambiado para claridad si solo se filtra por año #}
+                {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {{ 'selected' if mes_seleccionado == i else '' }}>{{ py_date(2000, i, 1).strftime('%B').capitalize() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="anio" class="form-label">Año:</label>
+            {# Popular años dinámicamente o usar un rango razonable. Aquí usamos el existente + un rango. #}
+            {% set anio_actual = py_date.today().year %}
+            <select name="anio" id="anio" class="form-select">
+                 <option value="">-- Todos los Años --</option> {# Opción para no filtrar por año, si la lógica lo soporta #}
+                {% for i in range(anio_actual - 5, anio_actual + 2) %}
+                     <option value="{{ i }}" {{ 'selected' if anio_seleccionado == i else ('' if anio_seleccionado else ('selected' if i == anio_actual else '')) }}>{{ i }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <button type="submit" class="btn btn-primary">Generar Reporte</button>
+        </div>
+        <div class="col-md-auto">
+            <a href="{{ url_for('reporte_costos_mensuales') }}" class="btn btn-secondary">Limpiar Filtros</a>
+        </div>
     </div>
 </form>
 
-{% if anio_seleccionado and mes_seleccionado %}
-    {% if mes_seleccionado_info %}
-        <h3>Costo Total para {{ mes_seleccionado_info.nombre_mes }} de {{ mes_seleccionado_info.anio }}</h3>
-        {% if costo_calculado is not none %}
-            <p style="font-size: 1.2em; color: #333;"><strong>Total: {{ "%.2f" | format(costo_calculado) }} €</strong></p>
-        {% else %}
-            <p>No se encontraron pedidos recibidos para este período o no se pudo calcular el costo.</p>
-        {% endif %}
+{# Resultados del filtro actual #}
+{% if anio_seleccionado or mes_seleccionado %} {# Mostrar solo si hay algún filtro aplicado #}
+    {% if costo_calculado is not none %}
+        <div class="alert alert-success">
+            Costo Total de Pedidos para
+            <strong>
+                {{ mes_seleccionado_info.nombre_mes if mes_seleccionado_info else "Todos los meses" }}
+                de {{ anio_seleccionado if anio_seleccionado else "Todos los años" }}
+            </strong>:
+            <strong>{{ "%.2f €"|format(costo_calculado) }}</strong>
+        </div>
     {% else %}
-        <p>Por favor, seleccione un año y mes válidos.</p>
+         <div class="alert alert-warning">
+            No se encontraron pedidos (o costos asociados) para
+            {{ mes_seleccionado_info.nombre_mes if mes_seleccionado_info else "el período" }}
+            {{ "de " + anio_seleccionado|string if anio_seleccionado else "" }} seleccionado.
+        </div>
     {% endif %}
-{% else %}
-    <p>Por favor, seleccione un año y mes para ver el reporte de costos.</p>
+{% elif not anio_seleccionado and not mes_seleccionado and request.args %}
+    {# Caso donde se limpiaron los filtros pero aún hay args (ej. ?mes=&anio=) #}
+     <div class="alert alert-info">Seleccione un mes y/o año para ver el reporte de costos.</div>
 {% endif %}
 
-<hr style="margin-top: 30px; margin-bottom: 20px;">
 
-<h4>Costos de Meses Anteriores (Pedidos Recibidos)</h4>
+<h4 class="mt-4">Historial de Costos Mensuales (Pedidos Recibidos):</h4>
 {% if meses_disponibles %}
-    <table>
-        <thead>
-            <tr>
-                <th>Año</th>
-                <th>Mes</th>
-                <th>Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m_info in meses_disponibles %}
-            <tr>
-                <td>{{ m_info.anio }}</td>
-                <td>{{ py_date(m_info.anio, m_info.mes, 1).strftime('%B').capitalize() }} ({{ '%02d' % m_info.mes }})</td> {# Usando py_date global #}
-                <td>
-                    <a href="{{ url_for('reporte_costos_mensuales') }}?anio={{ m_info.anio }}&mes={{ m_info.mes }}">Ver Costo</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="list-group">
+        {% for item in meses_disponibles %}
+            <a href="{{ url_for('reporte_costos_mensuales', anio=item.anio, mes=item.mes) }}"
+               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ 'active' if anio_seleccionado == item.anio and mes_seleccionado == item.mes else '' }}">
+                {{ item.nombre_mes }} {{ item.anio }}
+                <span class="badge bg-primary rounded-pill">{{ "%.2f €"|format(item.costo_total_mes) }}</span>
+            </a>
+        {% endfor %}
+    </div>
 {% else %}
-    <p>No hay datos de pedidos recibidos para mostrar un historial de costos.</p>
+    <div class="alert alert-secondary">No hay información de meses con pedidos (con estado "Recibido" y costo) para mostrar.</div>
 {% endif %}
-
-{# Necesitamos pasar py_date a las plantillas globales si no está ya disponible #}
-{# Esto se puede hacer al configurar Jinja2Templates en main_web.py #}
-{# templates.env.globals['py_date'] = py_date #}
 
 {% endblock %}
