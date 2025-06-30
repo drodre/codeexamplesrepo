@@ -57,8 +57,8 @@ class DetallePedidoCreate(DetallePedidoBase):
 
 class DetallePedidoSchema(DetallePedidoBase):
     id: int
-    pedido_id: int # Añadido para referencia
-    # medicamento: MedicamentoSchema # Descomentar si es necesario en respuestas
+    pedido_id: int
+    medicamento: MedicamentoSchema # Para mostrar info del medicamento en el detalle del pedido
 
     class Config:
         orm_mode = True
