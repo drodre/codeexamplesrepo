@@ -13,12 +13,12 @@
         <h1>Gestor de Medicamentos</h1>
         <nav>
             <ul>
-                <li><a href="{{ request.url_for('root') }}" class="{{ 'active' if request.url.path == str(request.url_for('root')) else '' }}">Inicio</a></li>
-                <li><a href="{{ request.url_for('listar_todos_medicamentos') }}" class="{{ 'active' if request.url.path.startswith(str(request.url_for('listar_todos_medicamentos'))) else '' }}">Medicamentos</a></li>
-                <li><a href="{{ request.url_for('listar_todos_pedidos') }}" class="{{ 'active' if request.url.path.startswith(str(request.url_for('listar_todos_pedidos'))) else '' }}">Pedidos</a></li>
+                <li><a href="{{ request.url_for('root') }}" class="{{ 'active' if request.url.path == request.url_for('root') else '' }}">Inicio</a></li>
+                <li><a href="{{ request.url_for('listar_todos_medicamentos') }}" class="{{ 'active' if request.url.path.startswith(request.url_for('listar_todos_medicamentos')) else '' }}">Medicamentos</a></li>
+                <li><a href="{{ request.url_for('listar_todos_pedidos') }}" class="{{ 'active' if request.url.path.startswith(request.url_for('listar_todos_pedidos')) else '' }}">Pedidos</a></li>
                 {# El enlace de Stock duplicado se puede eliminar o redirigir si es una sección diferente #}
                 {# <li><a href="{{ url_for('listar_todos_medicamentos') }}">Stock</a></li> #}
-                <li><a href="{{ request.url_for('reporte_costos_mensuales') }}" class="{{ 'active' if request.url.path == str(request.url_for('reporte_costos_mensuales')) else '' }}">Reportes</a></li>
+                <li><a href="{{ request.url_for('reporte_costos_mensuales') }}" class="{{ 'active' if request.url.path == request.url_for('reporte_costos_mensuales') else '' }}">Reportes</a></li>
             </ul>
         </nav>
     </header>
