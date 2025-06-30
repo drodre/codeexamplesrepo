@@ -533,6 +533,246 @@ async def eliminar_medicamento_submit(request: Request, medicamento_id: int, db:
         raise HTTPException(status_code=500, detail=f"Error al eliminar el medicamento: {e}")
 
 
+# --- CRUD Pedidos (Encabezado) ---
+
+@app.get("/pedidos/nuevo/", name="crear_pedido_form")
+async def crear_pedido_form(request: Request):
+    from datetime import date as py_date # Para el valor por defecto del campo fecha
+    return templates.TemplateResponse("form_pedido.html", {
+        "request": request,
+        "form_title": "Crear Nuevo Pedido",
+        "form_action": request.url_for("crear_pedido_submit"),
+        "pedido": None,
+        "estados_posibles": list(schemas.EstadoPedidoEnum), # Pasar los valores del Enum
+        "today_date_iso": py_date.today().isoformat(), # Para el default del input date
+        "errors": None
+    })
+
+@app.post("/pedidos/nuevo/", name="crear_pedido_submit")
+async def crear_pedido_submit(
+    request: Request,
+    fecha_pedido_str: Optional[str] = Form(None, alias="fecha_pedido"), # Recibir como string
+    proveedor: Optional[str] = Form(None),
+    estado: schemas.EstadoPedidoEnum = Form(schemas.EstadoPedidoEnum.PENDIENTE), # Usa el Enum
+    db: Session = Depends(get_db_session_fastapi)
+):
+    errors = []
+    from datetime import date as py_date # Para el valor por defecto del campo fecha
+
+    # Convertir y validar fecha_pedido
+    fecha_pedido_obj: Optional[py_date] = None
+    if fecha_pedido_str:
+        try:
+            fecha_pedido_obj = py_date.fromisoformat(fecha_pedido_str)
+        except ValueError:
+            errors.append({"loc": ["fecha_pedido"], "msg": "Formato de fecha inválido. Use YYYY-MM-DD."})
+    else: # Si no se provee, usar la fecha de hoy como default (el modelo también lo hace)
+        fecha_pedido_obj = py_date.today()
+
+    # Si hay error de fecha, no continuar con la validación Pydantic para ese campo
+    if errors:
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request,
+            "form_title": "Crear Nuevo Pedido",
+            "form_action": request.url_for("crear_pedido_submit"),
+            "pedido": {"proveedor": proveedor, "estado": estado}, # Re-popular
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": py_date.today().isoformat(),
+            "errors": errors
+        }, status_code=422)
+
+    try:
+        pedido_data = schemas.PedidoCreate(
+            fecha_pedido=fecha_pedido_obj, # Usar el objeto date validado
+            proveedor=proveedor,
+            estado=estado
+        )
+    except ValidationError as e:
+        # Capturar errores de Pydantic (aunque la fecha ya se validó, podrían haber otros)
+        current_form_data = {
+            "fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else py_date.today().isoformat(), # Re-popular con lo que se pudo parsear
+            "proveedor": proveedor,
+            "estado": estado.value # Pasar el valor del enum para el formulario
+        }
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request,
+            "form_title": "Crear Nuevo Pedido",
+            "form_action": request.url_for("crear_pedido_submit"),
+            "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": py_date.today().isoformat(),
+            "errors": e.errors()
+        }, status_code=422)
+
+    try:
+        pedido = crud.crear_pedido(db=db, fecha_pedido=pedido_data.fecha_pedido,
+                                   proveedor=pedido_data.proveedor, estado=pedido_data.estado)
+        # Redirigir a la página de detalle del pedido recién creado
+        return RedirectResponse(url=request.url_for("detalle_pedido_ruta", pedido_id=pedido.id), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al guardar el pedido: {e}"})
+        current_form_data = {
+            "fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else py_date.today().isoformat(),
+            "proveedor": proveedor,
+            "estado": estado.value
+        }
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request,
+            "form_title": "Crear Nuevo Pedido",
+            "form_action": request.url_for("crear_pedido_submit"),
+            "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": py_date.today().isoformat(),
+            "errors": errors
+        }, status_code=500)
+
+@app.get("/pedidos/{pedido_id}/editar/", name="editar_pedido_form")
+async def editar_pedido_form(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado")
+
+    from datetime import date as py_date # Para el formato de fecha
+    return templates.TemplateResponse("form_pedido.html", {
+        "request": request,
+        "form_title": f"Editar Pedido #{pedido.id}",
+        "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+        "pedido": pedido, # Pasar el pedido existente para pre-rellenar
+        "estados_posibles": list(schemas.EstadoPedidoEnum),
+        "today_date_iso": pedido.fecha_pedido.isoformat() if pedido.fecha_pedido else py_date.today().isoformat(), # Usar fecha del pedido o hoy
+        "errors": None
+    })
+
+@app.post("/pedidos/{pedido_id}/editar/", name="editar_pedido_submit")
+async def editar_pedido_submit(
+    request: Request,
+    pedido_id: int,
+    fecha_pedido_str: str = Form(..., alias="fecha_pedido"), # Fecha es requerida en el form
+    proveedor: Optional[str] = Form(None),
+    estado: schemas.EstadoPedidoEnum = Form(...),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    errors = []
+    pedido_original = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido_original:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado para actualizar")
+
+    from datetime import date as py_date
+    fecha_pedido_obj: Optional[py_date] = None
+    try:
+        fecha_pedido_obj = py_date.fromisoformat(fecha_pedido_str)
+    except ValueError:
+        errors.append({"loc": ["fecha_pedido"], "msg": "Formato de fecha inválido. Use YYYY-MM-DD."})
+
+    if errors: # Si hay error de fecha, re-renderizar antes de Pydantic
+        current_form_data = {
+            "id": pedido_id, # Para que la plantilla sepa que es edición
+            "fecha_pedido": fecha_pedido_str, # Mantener el string inválido para que el usuario lo vea
+            "proveedor": proveedor,
+            "estado": estado
+        }
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request,
+            "form_title": f"Editar Pedido #{pedido_id}",
+            "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+            "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": fecha_pedido_str, # Mantener el string inválido
+            "errors": errors
+        }, status_code=422)
+
+    try:
+        # Usamos PedidoUpdate, que tiene todos los campos como opcionales.
+        # La función crud.actualizar_pedido tomará solo los campos que se le pasen.
+        pedido_data_update = schemas.PedidoUpdate(
+            fecha_pedido=fecha_pedido_obj,
+            proveedor=proveedor,
+            estado=estado
+        )
+    except ValidationError as e:
+        current_form_data = {
+            "id": pedido_id,
+            "fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None,
+            "proveedor": proveedor,
+            "estado": estado
+        }
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request,
+            "form_title": f"Editar Pedido #{pedido_id}",
+            "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+            "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None,
+            "errors": e.errors()
+        }, status_code=422)
+
+    try:
+        # crud.actualizar_pedido espera un dict con solo los campos a cambiar.
+        # .dict(exclude_unset=True) es útil aquí.
+        update_data_dict = pedido_data_update.dict(exclude_unset=True)
+
+        # Manejo especial para que un string vacío en proveedor signifique None
+        if proveedor == "" and 'proveedor' in update_data_dict: # Si se envió un string vacío
+            update_data_dict['proveedor'] = None
+        elif proveedor is None and 'proveedor' not in update_data_dict and pedido_original.proveedor is not None:
+            # Si el campo no se envió (y antes tenía valor), y queremos que se ponga a None
+             update_data_dict['proveedor'] = None
+
+
+        if not update_data_dict: # Si no hay cambios efectivos
+            return RedirectResponse(url=request.url_for("detalle_pedido_ruta", pedido_id=pedido_id), status_code=303)
+
+        pedido = crud.actualizar_pedido(db, pedido_id=pedido_id, datos_actualizacion=update_data_dict)
+        if not pedido:
+            raise HTTPException(status_code=404, detail="Pedido no encontrado después de intentar actualizar.")
+
+        return RedirectResponse(url=request.url_for("detalle_pedido_ruta", pedido_id=pedido_id), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al actualizar el pedido: {e}"})
+        current_form_data = {
+            "id": pedido_id,
+            "fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None,
+            "proveedor": proveedor,
+            "estado": estado
+        }
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request,
+            "form_title": f"Editar Pedido #{pedido_id}",
+            "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+            "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None,
+            "errors": errors
+        }, status_code=500)
+
+@app.get("/pedidos/{pedido_id}/eliminar/", name="eliminar_pedido_confirm_form")
+async def eliminar_pedido_confirm_form(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado")
+
+    return templates.TemplateResponse("confirmar_eliminacion_pedido.html", {
+        "request": request,
+        "pedido": pedido,
+        "title": f"Confirmar Eliminación Pedido #{pedido.id}"
+    })
+
+@app.post("/pedidos/{pedido_id}/eliminar/", name="eliminar_pedido_submit")
+async def eliminar_pedido_submit(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido_a_eliminar = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido_a_eliminar:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado para eliminar")
+
+    try:
+        eliminado = crud.eliminar_pedido(db, pedido_id=pedido_id)
+        if not eliminado:
+             raise HTTPException(status_code=500, detail=f"No se pudo eliminar el pedido ID {pedido_id} por una razón desconocida.")
+
+        return RedirectResponse(url=request.url_for("listar_todos_pedidos"), status_code=303)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar el pedido: {e}")
+
+
 # Aquí se añadirán más rutas.
 
 if __name__ == "__main__":

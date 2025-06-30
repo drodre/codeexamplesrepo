@@ -23,33 +23,30 @@ class MedicamentoSchema(MedicamentoBase):
     id: int
 
     class Config:
-        orm_mode = True # Compatible con SQLAlchemy ORM (from_orm)
+        orm_mode = True
+        from_attributes = True # Para Pydantic V2, alias de orm_mode
 
-# --- LoteStock Schemas (Placeholder para futuro) ---
+# --- LoteStock Schemas ---
 class LoteStockBase(BaseModel):
     medicamento_id: int
     cantidad_cajas: int
     unidades_por_caja_lote: int
-    fecha_compra_lote: date
+    fecha_compra_lote: date # Hacerla opcional si el modelo tiene default? Modelo tiene default.
     fecha_vencimiento_lote: date
     precio_compra_lote_por_caja: Optional[float] = None
 
 class LoteStockCreate(LoteStockBase):
-    pass
+    fecha_compra_lote: Optional[date] = None # Coincide con el default del modelo SQL
 
 class LoteStockSchema(LoteStockBase):
     id: int
-    medicamento: MedicamentoSchema # Para mostrar info del medicamento al que pertenece
+    # medicamento: MedicamentoSchema # Descomentar si es necesario en respuestas
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
-# --- Pedido Schemas (Placeholder para futuro) ---
-# class EstadoPedidoEnum(str, Enum): # Ya definido en models.py, ver cómo integrar o redefinir para Pydantic
-#     PENDIENTE = "Pendiente"
-#     RECIBIDO = "Recibido"
-#     CANCELADO = "Cancelado"
-
+# --- DetallePedido Schemas ---
 class DetallePedidoBase(BaseModel):
     medicamento_id: int
     cantidad_cajas_pedidas: int
@@ -60,29 +57,40 @@ class DetallePedidoCreate(DetallePedidoBase):
 
 class DetallePedidoSchema(DetallePedidoBase):
     id: int
-    # medicamento: MedicamentoSchema # Para mostrar info del medicamento
+    pedido_id: int # Añadido para referencia
+    # medicamento: MedicamentoSchema # Descomentar si es necesario en respuestas
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
+# --- Pedido Schemas ---
+# Importar el Enum del modelo para usarlo en Pydantic
+from .models import EstadoPedido as EstadoPedidoEnum
 
 class PedidoBase(BaseModel):
-    fecha_pedido: Optional[date] = None
+    fecha_pedido: Optional[date] = None # El modelo SQL tiene default, así que puede ser opcional aquí
     proveedor: Optional[str] = None
-    # estado: EstadoPedidoEnum # Ver models.EstadoPedido
+    estado: EstadoPedidoEnum = EstadoPedidoEnum.PENDIENTE # Usar el Enum del modelo
 
 class PedidoCreate(PedidoBase):
-    # detalles: Optional[List[DetallePedidoCreate]] = [] # Para crear con detalles
+    # No se incluyen detalles aquí por ahora, se añadirán por separado.
     pass
+
+class PedidoUpdate(PedidoBase):
+    # Para actualizar, todos los campos son opcionales
+    fecha_pedido: Optional[date] = None
+    proveedor: Optional[str] = None
+    estado: Optional[EstadoPedidoEnum] = None
 
 class PedidoSchema(PedidoBase):
     id: int
-    # estado: str # Para mostrar el valor del enum
-    # detalles: List[DetallePedidoSchema] = []
-    # costo_total_pedido: Optional[float] = None # Se calculará
+    detalles: List[DetallePedidoSchema] = [] # Para mostrar los ítems del pedido
+    # costo_total_pedido: float # Se calculará en la vista/ruta, no es parte del modelo directo
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 # Actualizar MedicamentoSchema para incluir lotes (ejemplo de cómo se podría hacer)
