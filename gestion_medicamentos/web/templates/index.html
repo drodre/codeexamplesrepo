@@ -1,14 +1,46 @@
 {% extends "base.html" %}
 
-{% block title %}Inicio - Gestor de Medicamentos{% endblock %}
+{% block title %}{{ title }} - Gestor de Medicamentos{% endblock %}
 
 {% block content %}
-<h2>Bienvenido al Gestor de Medicamentos Caseros</h2>
-<p>Esta aplicación le permite llevar un control de los medicamentos en su hogar.</p>
-<p>Utilice la navegación para acceder a las diferentes secciones:</p>
-<ul>
-    <li><a href="/medicamentos/">Ver Medicamentos</a> - Listar y gestionar los medicamentos existentes.</li>
-    {# <li><a href="/pedidos/">Ver Pedidos</a> - Gestionar los pedidos de medicamentos.</li> #}
-</ul>
-<p>Actualmente, esta interfaz web se enfoca en la visualización de datos. La gestión (añadir, editar, eliminar) se realiza a través de la <a href="https://github.com/nombre_usuario/nombre_repo/blob/main/gestion_medicamentos/README.md#ejecuci%C3%B3n-de-la-aplicaci%C3%B3n-cli" target="_blank">interfaz de línea de comandos (CLI)</a>.</p>
+<h2>Bienvenido al Gestor de Medicamentos</h2>
+<p class="lead">Resumen rápido del estado de sus medicamentos.</p>
+
+<div class="dashboard-cards">
+    <div class="card">
+        <h3>Total de Medicamentos</h3>
+        <p>{{ total_medicamentos if total_medicamentos is not none else 'N/A' }}</p>
+        <a href="{{ url_for('listar_todos_medicamentos') }}">Ver todos los medicamentos</a>
+    </div>
+    <div class="card {{ 'alert-warning' if proximos_a_vencer > 0 else '' }}">
+        <h3>Próximos a Vencer</h3>
+        <p>{{ proximos_a_vencer if proximos_a_vencer is not none else 'N/A' }}</p>
+        <small>(En los próximos {{ dias_proximo_vencer }} días)</small><br>
+        <a href="{{ url_for('listar_todos_medicamentos') }}?filtro=proximos_vencer">Ver detalles</a> {# Asume filtro futuro #}
+    </div>
+    <div class="card {{ 'alert-danger' if lotes_vencidos > 0 else '' }}">
+        <h3>Lotes Vencidos</h3>
+        <p>{{ lotes_vencidos if lotes_vencidos is not none else 'N/A' }}</p>
+        <small>(Lotes individuales vencidos en stock)</small><br>
+        <a href="{{ url_for('listar_todos_medicamentos') }}?filtro=vencidos">Revisar lotes vencidos</a> {# Asume filtro futuro #}
+    </div>
+    <div class="card {{ 'alert-warning' if stock_bajo > 0 else '' }}">
+        <h3>Stock Bajo</h3>
+        <p>{{ stock_bajo if stock_bajo is not none else 'N/A' }}</p>
+        <small>(Menos de {{ umbral_stock_bajo }} unidades activas)</small><br>
+        <a href="{{ url_for('listar_todos_medicamentos') }}?filtro=stock_bajo">Revisar medicamentos con stock bajo</a> {# Asume filtro futuro #}
+    </div>
+</div>
+
+<div class="mt-4">
+    <h3>Acciones Rápidas</h3>
+    <p>
+        <a href="{{ url_for('crear_medicamento_form') }}" class="btn btn-primary">Añadir Nuevo Medicamento</a>
+        <a href="{{ url_for('crear_pedido_form') }}" class="btn btn-primary">Registrar Nuevo Pedido</a>
+        <a href="{{ url_for('reporte_costos_mensuales') }}" class="btn btn-info">Ver Reporte de Costos</a>
+    </p>
+</div>
+
+<p class="mt-4">Utilice la navegación superior para acceder a todas las secciones y funcionalidades de la aplicación.</p>
+
 {% endblock %}

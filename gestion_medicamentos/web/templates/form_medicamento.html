@@ -5,42 +5,57 @@
 {% block content %}
 <h2>{{ form_title }}</h2>
 
-<form method="post" action="{{ form_action }}">
-    <div>
-        <label for="nombre">Nombre del Medicamento:</label>
-        <input type="text" id="nombre" name="nombre" value="{{ medicamento.nombre if medicamento else '' }}" required>
-    </div>
-    <div style="margin-top: 10px;">
-        <label for="marca">Marca (Opcional):</label>
-        <input type="text" id="marca" name="marca" value="{{ medicamento.marca if medicamento and medicamento.marca is not none else '' }}">
-    </div>
-    <div style="margin-top: 10px;">
-        <label for="unidades_por_caja">Unidades por Caja:</label>
-        <input type="number" id="unidades_por_caja" name="unidades_por_caja" value="{{ medicamento.unidades_por_caja if medicamento else '' }}" required min="1">
-    </div>
-    <div style="margin-top: 10px;">
-        <label for="precio_por_caja_referencia">Precio de Referencia por Caja (Opcional, ej. 10.50):</label>
-        <input type="number" id="precio_por_caja_referencia" name="precio_por_caja_referencia" value="{{ medicamento.precio_por_caja_referencia if medicamento and medicamento.precio_por_caja_referencia is not none else '' }}" step="0.01" min="0">
-    </div>
-
-    {# Campo oculto para el método en caso de querer simular PUT/PATCH si el framework no lo soporta nativamente con forms HTML #}
-    {# {% if medicamento %} <input type="hidden" name="_method" value="PUT"> {% endif %} #}
-
-    <div style="margin-top: 20px;">
-        <button type="submit">Guardar Medicamento</button>
-        <a href="{{ url_for('listar_todos_medicamentos') }}" style="margin-left: 10px;">Cancelar</a>
-    </div>
-</form>
-
 {% if errors %}
-    <div style="margin-top: 20px; color: red;">
-        <h4>Errores de validación:</h4>
+    <div class="alert alert-danger">
+        <strong>Error(es) en el formulario:</strong>
         <ul>
             {% for error in errors %}
-                <li>{{ error.loc[1] if error.loc|length > 1 else error.loc[0] }}: {{ error.msg }}</li>
+                <li>
+                    {% if error.loc and error.loc|length > 1 %}
+                        En campo '{{ error.loc[1] }}': {{ error.msg }}
+                    {% elif error.loc and error.loc|length == 1 %}
+                         En campo '{{ error.loc[0] }}': {{ error.msg }}
+                    {% elif error.msg %}
+                        {{ error.msg }}
+                    {% else %}
+                        Error desconocido.
+                    {% endif %}
+                </li>
             {% endfor %}
         </ul>
     </div>
 {% endif %}
 
+<form method="POST" action="{{ form_action }}">
+    {# Obtener valores del request.form si existen (útil cuando hay un error de validación y se repopula) #}
+    {% set req_form = request.form if request and request.form else {} %}
+
+    <div class="form-group mb-3">
+        <label for="nombre">Nombre del Medicamento:</label>
+        <input type="text" id="nombre" name="nombre" class="form-control" required
+               value="{{ medicamento.nombre if medicamento else req_form.get('nombre', '') }}">
+    </div>
+    <div class="form-group mb-3">
+        <label for="marca">Marca (opcional):</label>
+        <input type="text" id="marca" name="marca" class="form-control"
+               value="{{ medicamento.marca if medicamento and medicamento.marca is not none else req_form.get('marca', '') }}">
+    </div>
+    <div class="form-group mb-3">
+        <label for="unidades_por_caja">Unidades por Caja:</label>
+        <input type="number" id="unidades_por_caja" name="unidades_por_caja" class="form-control" required min="1"
+               value="{{ medicamento.unidades_por_caja if medicamento else req_form.get('unidades_por_caja', '1') }}">
+    </div>
+    <div class="form-group mb-3">
+        <label for="precio_por_caja_referencia">Precio de Referencia por Caja (opcional, ej: 12.99):</label>
+        <input type="number" id="precio_por_caja_referencia" name="precio_por_caja_referencia" class="form-control" step="0.01" min="0"
+               value="{{ medicamento.precio_por_caja_referencia if medicamento and medicamento.precio_por_caja_referencia is not none else req_form.get('precio_por_caja_referencia', '') }}">
+    </div>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">
+            {{ 'Actualizar' if medicamento else 'Crear' }} Medicamento
+        </button>
+        <a href="{{ url_for('listar_todos_medicamentos') }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
 {% endblock %}
