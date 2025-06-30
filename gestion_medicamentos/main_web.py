@@ -31,6 +31,7 @@ templates_dir = os.path.join(current_dir, "web", "templates")
 templates = Jinja2Templates(directory=templates_dir)
 templates.env.globals['py_date'] = py_date # Hacer py_date (datetime.date) accesible en todas las plantillas
 templates.env.globals['len'] = len # Hacer len() accesible
+templates.env.globals['current_year'] = py_date.today().year # Añadir año actual
 
 # Montar directorio estático
 static_dir = os.path.join(current_dir, "web", "static")
