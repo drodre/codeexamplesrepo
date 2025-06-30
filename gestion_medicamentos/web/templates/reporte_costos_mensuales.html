@@ -29,7 +29,7 @@
             <option value="">Seleccione un mes...</option>
             {% for i in range(1, 13) %}
             <option value="{{ i }}" {% if i == mes_seleccionado %}selected{% endif %}>
-                {{ '%02d' % i }} - {{ (request.state.py_date(2000, i, 1)).strftime('%B').capitalize() }} {# Nombre del mes #}
+                {{ '%02d' % i }} - {{ py_date(2000, i, 1).strftime('%B').capitalize() }} {# Nombre del mes, usando py_date global #}
             </option>
             {% endfor %}
         </select>
@@ -68,7 +68,7 @@
             {% for m_info in meses_disponibles %}
             <tr>
                 <td>{{ m_info.anio }}</td>
-                <td>{{ (request.state.py_date(m_info.anio, m_info.mes, 1)).strftime('%B').capitalize() }} ({{ '%02d' % m_info.mes }})</td>
+                <td>{{ py_date(m_info.anio, m_info.mes, 1).strftime('%B').capitalize() }} ({{ '%02d' % m_info.mes }})</td> {# Usando py_date global #}
                 <td>
                     <a href="{{ url_for('reporte_costos_mensuales') }}?anio={{ m_info.anio }}&mes={{ m_info.mes }}">Ver Costo</a>
                 </td>
