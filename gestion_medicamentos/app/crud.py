@@ -95,7 +95,7 @@ def calcular_stock_total_unidades(db: Session, medicamento_id: int) -> int:
         total_unidades += lote.unidades_totales_lote # Usando la property del modelo LoteStock
     return total_unidades
 
-def calcular_fecha_vencimiento_proxima(db: Session, medicamento_id: int) -> Optional[date]:
+def calcular_fecha_vencimiento_proxima(db: Session, medicamento_id: int) -> Optional[py_date]:
     """
     Calcula la fecha de vencimiento más próxima entre los lotes activos
     de un medicamento.
@@ -111,7 +111,7 @@ def calcular_fecha_vencimiento_proxima(db: Session, medicamento_id: int) -> Opti
 
 # --- Funciones CRUD para Pedido ---
 
-def crear_pedido(db: Session, fecha_pedido: Optional[date] = None, proveedor: Optional[str] = None,
+def crear_pedido(db: Session, fecha_pedido: Optional[py_date] = None, proveedor: Optional[str] = None,
                  estado: models.EstadoPedido = models.EstadoPedido.PENDIENTE) -> models.Pedido:
     """
     Crea un nuevo pedido.
@@ -321,7 +321,7 @@ def eliminar_detalle_pedido(db: Session, detalle_id: int) -> bool:
 # --- Funciones CRUD para LoteStock ---
 
 def agregar_lote_stock(db: Session, medicamento_id: int, cantidad_cajas: int, unidades_por_caja_lote: int,
-                       fecha_vencimiento_lote: date, fecha_compra_lote: Optional[date] = None,
+                       fecha_vencimiento_lote: py_date, fecha_compra_lote: Optional[py_date] = None,
                        precio_compra_lote_por_caja: Optional[float] = None) -> models.LoteStock:
     """
     Agrega un nuevo lote de stock para un medicamento existente.
@@ -360,7 +360,7 @@ def obtener_lotes_por_medicamento(db: Session, medicamento_id: int, solo_activos
     """
     query = db.query(models.LoteStock).filter(models.LoteStock.medicamento_id == medicamento_id)
     if solo_activos:
-        query = query.filter(models.LoteStock.fecha_vencimiento_lote >= date.today())
+        query = query.filter(models.LoteStock.fecha_vencimiento_lote >= py_date.today())
     return query.order_by(models.LoteStock.fecha_vencimiento_lote).all() # Ordenar por fecha de vencimiento
 
 
