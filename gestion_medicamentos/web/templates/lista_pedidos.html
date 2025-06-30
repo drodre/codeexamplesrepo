@@ -5,40 +5,41 @@
 {% block content %}
 <h2>Listado de Pedidos</h2>
 
+<div class="mb-3">
+    <a href="{{ url_for('crear_pedido_form') }}" class="btn btn-success">Crear Nuevo Pedido</a>
+</div>
+
 {% if pedidos_info %}
     <table>
         <thead>
             <tr>
-                <th>ID Pedido</th>
-                <th>Fecha Pedido</th>
-                <th>Proveedor</th>
-                <th>Estado</th>
-                <th>Costo Total</th>
-                <th>Acciones</th>
+                <th scope="col">ID Pedido</th>
+                <th scope="col">Fecha Pedido</th>
+                <th scope="col">Proveedor</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Costo Total Estimado</th>
+                <th scope="col">Acciones</th>
             </tr>
         </thead>
         <tbody>
-            {% for info in pedidos_info %}
+            {% for p_info in pedidos_info %}
             <tr>
-                <td>{{ info.pedido.id }}</td>
-                <td>{{ info.pedido.fecha_pedido.strftime('%d/%m/%Y') }}</td>
-                <td>{{ info.pedido.proveedor if info.pedido.proveedor else 'N/A' }}</td>
-                <td>{{ info.pedido.estado.value }}</td>
-                <td>{{ "%.2f" | format(info.costo_total) }}</td>
-                <td>
-                    <a href="{{ url_for('detalle_pedido_ruta', pedido_id=info.pedido.id) }}">Ver Detalles</a> |
-                    <a href="{{ url_for('editar_pedido_form', pedido_id=info.pedido.id) }}">Editar Encabezado</a> |
-                    <a href="{{ url_for('eliminar_pedido_confirm_form', pedido_id=info.pedido.id) }}">Eliminar</a>
+                <td data-label="ID Pedido">{{ p_info.pedido.id }}</td>
+                <td data-label="Fecha Pedido">{{ p_info.pedido.fecha_pedido.strftime('%d/%m/%Y') }}</td>
+                <td data-label="Proveedor">{{ p_info.pedido.proveedor if p_info.pedido.proveedor else 'N/A' }}</td>
+                <td data-label="Estado">{{ p_info.pedido.estado.value if p_info.pedido.estado else 'N/A' }}</td>
+                <td data-label="Costo Total" class="text-right">{{ "%.2f €"|format(p_info.costo_total) if p_info.costo_total is not none else 'N/A' }}</td>
+                <td data-label="Acciones">
+                    <a href="{{ url_for('detalle_pedido_ruta', pedido_id=p_info.pedido.id) }}" class="btn btn-sm btn-info">Ver</a>
+                    <a href="{{ url_for('editar_pedido_form', pedido_id=p_info.pedido.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                    <a href="{{ url_for('eliminar_pedido_confirm_form', pedido_id=p_info.pedido.id) }}" class="btn btn-sm btn-danger">Eliminar</a>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 {% else %}
-    <p>No hay pedidos registrados en la base de datos.</p>
+    <div class="alert alert-info">No hay pedidos registrados.</div>
 {% endif %}
 
-<p style="margin-top: 20px;">
-    <a href="{{ url_for('crear_pedido_form') }}" style="background-color: #5cb85c; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Crear Nuevo Pedido</a>
-</p>
 {% endblock %}

@@ -4,17 +4,19 @@ import os
 import sys
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles # Importar StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 from typing import Optional, List
-from datetime import date as py_date # Renombrar para evitar conflicto con models.Date
+from datetime import date as py_date, timedelta # Renombrar para evitar conflicto con models.Date
 
 # Añadir el directorio de la aplicación al sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from app import crud, models, database, schemas
+    from app.crud import contar_total_medicamentos, contar_medicamentos_proximos_a_vencer, contar_lotes_vencidos_no_eliminados, contar_medicamentos_stock_bajo # Asegúrate que estas funciones existan
 except ImportError as e:
     print(f"Error importando módulos de app: {e}")
     print(f"sys.path actual: {sys.path}")
@@ -23,9 +25,17 @@ except ImportError as e:
 app = FastAPI(title="Gestor de Medicamentos Caseros - Web", version="0.1.0")
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Configurar directorio de plantillas
 templates_dir = os.path.join(current_dir, "web", "templates")
 templates = Jinja2Templates(directory=templates_dir)
 templates.env.globals['py_date'] = py_date # Hacer py_date (datetime.date) accesible en todas las plantillas
+templates.env.globals['len'] = len # Hacer len() accesible
+
+# Montar directorio estático
+static_dir = os.path.join(current_dir, "web", "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
 # --- Dependencia de Sesión de BD ---
 def get_db_session_fastapi():
@@ -39,8 +49,26 @@ def get_db_session_fastapi():
 
 # --- Rutas Principales ---
 @app.get("/", name="root")
-async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "title": "Página de Inicio"})
+async def root(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    # Definir umbrales (podrían ser configurables en el futuro)
+    dias_proximo_vencer = 30
+    umbral_stock_bajo = 10 # Unidades
+
+    total_medicamentos = contar_total_medicamentos(db)
+    proximos_a_vencer = contar_medicamentos_proximos_a_vencer(db, dias_limite=dias_proximo_vencer)
+    lotes_vencidos = contar_lotes_vencidos_no_eliminados(db) # Asume que esta función solo cuenta los que aún están (no "eliminados" lógicamente)
+    stock_bajo = contar_medicamentos_stock_bajo(db, umbral_unidades=umbral_stock_bajo)
+
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "title": "Inicio - Dashboard",
+        "total_medicamentos": total_medicamentos,
+        "proximos_a_vencer": proximos_a_vencer,
+        "lotes_vencidos": lotes_vencidos,
+        "stock_bajo": stock_bajo,
+        "dias_proximo_vencer": dias_proximo_vencer,
+        "umbral_stock_bajo": umbral_stock_bajo
+    })
 
 # --- Rutas para Medicamentos ---
 @app.get("/medicamentos/", name="listar_todos_medicamentos")

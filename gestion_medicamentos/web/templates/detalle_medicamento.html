@@ -5,63 +5,83 @@
 {% block content %}
 <h2>Detalle del Medicamento: {{ medicamento.nombre }}</h2>
 
-<p><strong>ID:</strong> {{ medicamento.id }}</p>
-<p><strong>Nombre:</strong> {{ medicamento.nombre }}</p>
-<p><strong>Marca:</strong> {{ medicamento.marca if medicamento.marca else 'N/A' }}</p>
-<p><strong>Unidades por Caja:</strong> {{ medicamento.unidades_por_caja }}</p>
-<p><strong>Precio de Referencia por Caja:</strong> {{ medicamento.precio_por_caja_referencia if medicamento.precio_por_caja_referencia is not none else 'N/A' }}</p>
-
-<h3>Stock y Vencimiento</h3>
-<p><strong>Stock Total (Unidades Activas):</strong> {{ stock_total }}</p>
-<p><strong>Fecha de Vencimiento Próxima (Lotes Activos):</strong> {{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A' }}</p>
-
-<h3>Lotes de Stock</h3>
-{% if lotes %}
-    <table>
-        <thead>
-            <tr>
-                <th>ID Lote</th>
-                <th>Cantidad de Cajas</th>
-                <th>Unidades/Caja (Lote)</th>
-                <th>Total Unidades (Lote)</th>
-                <th>Fecha de Compra</th>
-                <th>Fecha de Vencimiento</th>
-                <th>Precio Compra/Caja (Lote)</th>
-                <th>Activo (No Vencido)</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for lote in lotes %}
-            <tr>
-                <td>{{ lote.id }}</td>
-                <td>{{ lote.cantidad_cajas }}</td>
-                <td>{{ lote.unidades_por_caja_lote }}</td>
-                <td>{{ lote.unidades_totales_lote }}</td>
-                <td>{{ lote.fecha_compra_lote.strftime('%d/%m/%Y') }}</td>
-                <td>{{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}</td>
-                <td>{{ lote.precio_compra_lote_por_caja if lote.precio_compra_lote_por_caja is not none else 'N/A' }}</td>
-                <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No{% endif %}</td>
-                <td>
-                    <a href="{{ url_for('editar_lote_form', lote_id=lote.id) }}" style="font-size: 0.9em; margin-right: 5px;">Editar</a>
-                    <a href="{{ url_for('eliminar_lote_confirm_form', lote_id=lote.id) }}" style="font-size: 0.9em; color: #d9534f;">Eliminar</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
+<div class="detail-section">
+    <h3>Información General</h3>
+    <table class="detail-table">
+        <tr><th>ID:</th><td>{{ medicamento.id }}</td></tr>
+        <tr><th>Nombre:</th><td>{{ medicamento.nombre }}</td></tr>
+        <tr><th>Marca:</th><td>{{ medicamento.marca if medicamento.marca else 'N/A' }}</td></tr>
+        <tr><th>Unidades por Caja:</th><td>{{ medicamento.unidades_por_caja }}</td></tr>
+        <tr><th>Precio de Referencia por Caja:</th><td>{{ "%.2f €"|format(medicamento.precio_por_caja_referencia) if medicamento.precio_por_caja_referencia is not none else 'N/A' }}</td></tr>
     </table>
-{% else %}
-    <p>No hay lotes de stock registrados para este medicamento.</p>
-{% endif %}
-
-<div style="margin-top: 20px;">
-     <a href="{{ url_for('crear_lote_form', medicamento_id=medicamento.id) }}" style="background-color: #5cb85c; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin-right: 10px;">Añadir Nuevo Lote de Stock</a>
 </div>
 
-<div style="margin-top: 30px;">
-    <a href="{{ url_for('editar_medicamento_form', medicamento_id=medicamento.id) }}" style="background-color: #f0ad4e; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin-right: 10px;">Editar Medicamento</a>
-    <a href="{{ url_for('eliminar_medicamento_confirm_form', medicamento_id=medicamento.id) }}" style="background-color: #d9534f; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Eliminar Medicamento</a>
+<div class="detail-section mt-3">
+    <h3>Stock y Vencimiento</h3>
+     <table class="detail-table">
+        <tr><th>Stock Total (Unidades Activas):</th><td>{{ stock_total }}</td></tr>
+        <tr><th>Fecha de Vencimiento Próxima (Lotes Activos):</th><td>{{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A (Sin lotes activos)' }}</td></tr>
+    </table>
 </div>
 
-<p style="margin-top: 20px;"><a href="{{ url_for('listar_todos_medicamentos') }}">Volver a la lista de medicamentos</a></p>
+<div class="detail-section mt-3">
+    <h3>Lotes de Stock</h3>
+    <div class="mb-2">
+        <a href="{{ url_for('crear_lote_form', medicamento_id=medicamento.id) }}" class="btn btn-success btn-sm">Añadir Nuevo Lote de Stock</a>
+    </div>
+    {% if lotes %}
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">ID Lote</th>
+                    <th scope="col">Cant. Cajas</th>
+                    <th scope="col">Uds./Caja (Lote)</th>
+                    <th scope="col">Total Uds. (Lote)</th>
+                    <th scope="col">Fecha Compra</th>
+                    <th scope="col">Fecha Vencimiento</th>
+                    <th scope="col">Precio Compra/Caja</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lote in lotes %}
+                {% set hoy = py_date.today() %}
+                {% set es_vencido = lote.fecha_vencimiento_lote < hoy %}
+                {% set dias_para_vencer = (lote.fecha_vencimiento_lote - hoy).days %}
+                {% set lote_class = 'row-expired' if es_vencido else ('row-warning' if dias_para_vencer <= 30 else '') %}
+                {% set estado_texto = 'Vencido' if es_vencido else ('Próximo (' ~ dias_para_vencer ~ ' días)' if dias_para_vencer <= 30 else 'Activo') %}
+
+                <tr class="{{ lote_class }}">
+                    <td data-label="ID Lote">{{ lote.id }}</td>
+                    <td data-label="Cant. Cajas" class="text-center">{{ lote.cantidad_cajas }}</td>
+                    <td data-label="Uds./Caja (Lote)" class="text-center">{{ lote.unidades_por_caja_lote }}</td>
+                    <td data-label="Total Uds. (Lote)" class="text-center">{{ lote.unidades_totales_lote }}</td>
+                    <td data-label="Fecha Compra">{{ lote.fecha_compra_lote.strftime('%d/%m/%Y') }}</td>
+                    <td data-label="Fecha Vencimiento">{{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}</td>
+                    <td data-label="Precio Compra/Caja" class="text-right">{{ "%.2f €"|format(lote.precio_compra_lote_por_caja) if lote.precio_compra_lote_por_caja is not none else 'N/A' }}</td>
+                    <td data-label="Estado">
+                        <span class="{{ 'status-expired' if es_vencido else ('status-warning' if dias_para_vencer <= 30 else 'status-ok') }}">
+                            {{ estado_texto }}
+                        </span>
+                    </td>
+                    <td data-label="Acciones">
+                        <a href="{{ url_for('editar_lote_form', lote_id=lote.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                        <a href="{{ url_for('eliminar_lote_confirm_form', lote_id=lote.id) }}" class="btn btn-sm btn-danger">Eliminar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-info">No hay lotes de stock registrados para este medicamento.</div>
+    {% endif %}
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('editar_medicamento_form', medicamento_id=medicamento.id) }}" class="btn btn-warning">Editar Medicamento</a>
+    <a href="{{ url_for('eliminar_medicamento_confirm_form', medicamento_id=medicamento.id) }}" class="btn btn-danger">Eliminar Medicamento</a>
+    <a href="{{ url_for('listar_todos_medicamentos') }}" class="btn btn-secondary">Volver a la lista</a>
+</div>
+
 {% endblock %}
