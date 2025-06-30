@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar Eliminación Pedido - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Confirmar Eliminación de Pedido</h2>
+
+{% if pedido %}
+    <p>¿Está seguro de que desea eliminar el siguiente pedido?</p>
+    <p><strong>ID Pedido:</strong> {{ pedido.id }}</p>
+    <p><strong>Fecha:</strong> {{ pedido.fecha_pedido.strftime('%d/%m/%Y') }}</p>
+    <p><strong>Proveedor:</strong> {{ pedido.proveedor if pedido.proveedor else 'N/A' }}</p>
+    <p><strong>Estado:</strong> {{ pedido.estado.value }}</p>
+
+    <p style="color: red; font-weight: bold;">Esta acción no se puede deshacer y también eliminará todos los ítems (detalles) asociados a este pedido.</p>
+
+    <form method="post" action="{{ url_for('eliminar_pedido_submit', pedido_id=pedido.id) }}" style="margin-top: 20px;">
+        <button type="submit" style="background-color: #d9534f; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px;">Sí, Eliminar Definitivamente</button>
+        <a href="{{ url_for('detalle_pedido_ruta', pedido_id=pedido.id) }}" style="margin-left: 10px; text-decoration: none; background-color: #ccc; color: #333; padding: 10px 15px; border-radius: 4px;">Cancelar</a>
+    </form>
+{% else %}
+    <p>No se ha especificado un pedido para eliminar o no se encontró.</p>
+    <p><a href="{{ url_for('listar_todos_pedidos') }}">Volver a la lista de pedidos</a></p>
+{% endif %}
+
+{% endblock %}

@@ -26,7 +26,9 @@
                 <td>{{ info.pedido.estado.value }}</td>
                 <td>{{ "%.2f" | format(info.costo_total) }}</td>
                 <td>
-                    <a href="/pedidos/{{ info.pedido.id }}/">Ver Detalles</a>
+                    <a href="{{ url_for('detalle_pedido_ruta', pedido_id=info.pedido.id) }}">Ver Detalles</a> |
+                    <a href="{{ url_for('editar_pedido_form', pedido_id=info.pedido.id) }}">Editar Encabezado</a> |
+                    <a href="{{ url_for('eliminar_pedido_confirm_form', pedido_id=info.pedido.id) }}">Eliminar</a>
                 </td>
             </tr>
             {% endfor %}
@@ -36,5 +38,7 @@
     <p>No hay pedidos registrados en la base de datos.</p>
 {% endif %}
 
-{# <p><a href="/pedidos/nuevo/">Crear Nuevo Pedido</a> (Funcionalidad futura)</p> #}
+<p style="margin-top: 20px;">
+    <a href="{{ url_for('crear_pedido_form') }}" style="background-color: #5cb85c; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Crear Nuevo Pedido</a>
+</p>
 {% endblock %}
