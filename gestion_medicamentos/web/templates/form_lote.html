@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>{{ form_title }}</h2>
+{% if medicamento_info %}
+    <p><strong>Medicamento:</strong> {{ medicamento_info.nombre }} (ID: {{ medicamento_info.id }})</p>
+{% endif %}
+
+<form method="post" action="{{ form_action }}">
+    <div>
+        <label for="cantidad_cajas">Cantidad de Cajas:</label>
+        <input type="number" id="cantidad_cajas" name="cantidad_cajas"
+               value="{{ lote.cantidad_cajas if lote else '1' }}"
+               required min="1">
+    </div>
+
+    <div style="margin-top: 10px;">
+        <label for="unidades_por_caja_lote">Unidades por Caja para este Lote:</label>
+        <input type="number" id="unidades_por_caja_lote" name="unidades_por_caja_lote"
+               value="{{ lote.unidades_por_caja_lote if lote else (medicamento_info.unidades_por_caja if medicamento_info else '') }}"
+               required min="1">
+        <small>Por defecto, las unidades/caja del medicamento, pero puede ser específico para este lote.</small>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <label for="fecha_compra_lote">Fecha de Compra del Lote (YYYY-MM-DD):</label>
+        <input type="date" id="fecha_compra_lote" name="fecha_compra_lote"
+               value="{{ lote.fecha_compra_lote.strftime('%Y-%m-%d') if lote and lote.fecha_compra_lote else today_date_iso }}"
+               required>
+         <small>Si se deja vacío, se usará la fecha actual al guardar (para creación).</small>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <label for="fecha_vencimiento_lote">Fecha de Vencimiento del Lote (YYYY-MM-DD):</label>
+        <input type="date" id="fecha_vencimiento_lote" name="fecha_vencimiento_lote"
+               value="{{ lote.fecha_vencimiento_lote.strftime('%Y-%m-%d') if lote and lote.fecha_vencimiento_lote else '' }}"
+               required>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <label for="precio_compra_lote_por_caja">Precio de Compra por Caja para este Lote (Opcional):</label>
+        <input type="number" id="precio_compra_lote_por_caja" name="precio_compra_lote_por_caja"
+               value="{{ lote.precio_compra_lote_por_caja if lote and lote.precio_compra_lote_por_caja is not none else '' }}"
+               step="0.01" min="0">
+    </div>
+
+    <div style="margin-top: 20px;">
+        <button type="submit">Guardar Lote</button>
+        <a href="{{ url_for('detalle_medicamento', medicamento_id=(medicamento_info.id if medicamento_info else (lote.medicamento_id if lote else 0))) }}"
+           style="margin-left: 10px;">Cancelar y Volver al Medicamento</a>
+    </div>
+</form>
+
+{% if errors %}
+    <div style="margin-top: 20px; color: red;">
+        <h4>Errores de validación:</h4>
+        <ul>
+            {% for error in errors %}
+                <li>
+                    {% if error.loc|length > 1 %}
+                        {{ error.loc[1] }}
+                    {% elif error.loc %}
+                        {{ error.loc[0] }}
+                    {% else %}
+                        General
+                    {% endif %}
+                    : {{ error.msg }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+{% endblock %}

@@ -28,6 +28,7 @@
                 <th>Fecha de Vencimiento</th>
                 <th>Precio Compra/Caja (Lote)</th>
                 <th>Activo (No Vencido)</th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -41,6 +42,10 @@
                 <td>{{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}</td>
                 <td>{{ lote.precio_compra_lote_por_caja if lote.precio_compra_lote_por_caja is not none else 'N/A' }}</td>
                 <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No{% endif %}</td>
+                <td>
+                    <a href="{{ url_for('editar_lote_form', lote_id=lote.id) }}" style="font-size: 0.9em; margin-right: 5px;">Editar</a>
+                    <a href="{{ url_for('eliminar_lote_confirm_form', lote_id=lote.id) }}" style="font-size: 0.9em; color: #d9534f;">Eliminar</a>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -48,6 +53,10 @@
 {% else %}
     <p>No hay lotes de stock registrados para este medicamento.</p>
 {% endif %}
+
+<div style="margin-top: 20px;">
+     <a href="{{ url_for('crear_lote_form', medicamento_id=medicamento.id) }}" style="background-color: #5cb85c; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin-right: 10px;">Añadir Nuevo Lote de Stock</a>
+</div>
 
 <div style="margin-top: 30px;">
     <a href="{{ url_for('editar_medicamento_form', medicamento_id=medicamento.id) }}" style="background-color: #f0ad4e; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin-right: 10px;">Editar Medicamento</a>
