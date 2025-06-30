@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>{{ title }}</h2>
+
+<form method="get" action="{{ url_for('reporte_costos_mensuales') }}">
+    <div style="margin-bottom: 20px;">
+        <label for="anio_select">Año:</label>
+        <select id="anio_select" name="anio">
+            <option value="">Seleccione un año...</option>
+            {# Crear una lista única de años disponibles #}
+            {% set anios_unicos = [] %}
+            {% for m_d in meses_disponibles %}
+                {% if m_d.anio not in anios_unicos %}
+                    {% set _ = anios_unicos.append(m_d.anio) %}
+                {% endif %}
+            {% endfor %}
+            {% for anio_disp in anios_unicos|sort(reverse=True) %}
+            <option value="{{ anio_disp }}" {% if anio_disp == anio_seleccionado %}selected{% endif %}>
+                {{ anio_disp }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <label for="mes_select" style="margin-left: 10px;">Mes:</label>
+        <select id="mes_select" name="mes">
+            <option value="">Seleccione un mes...</option>
+            {% for i in range(1, 13) %}
+            <option value="{{ i }}" {% if i == mes_seleccionado %}selected{% endif %}>
+                {{ '%02d' % i }} - {{ (request.state.py_date(2000, i, 1)).strftime('%B').capitalize() }} {# Nombre del mes #}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" style="margin-left: 10px;">Generar Reporte</button>
+    </div>
+</form>
+
+{% if anio_seleccionado and mes_seleccionado %}
+    {% if mes_seleccionado_info %}
+        <h3>Costo Total para {{ mes_seleccionado_info.nombre_mes }} de {{ mes_seleccionado_info.anio }}</h3>
+        {% if costo_calculado is not none %}
+            <p style="font-size: 1.2em; color: #333;"><strong>Total: {{ "%.2f" | format(costo_calculado) }} €</strong></p>
+        {% else %}
+            <p>No se encontraron pedidos recibidos para este período o no se pudo calcular el costo.</p>
+        {% endif %}
+    {% else %}
+        <p>Por favor, seleccione un año y mes válidos.</p>
+    {% endif %}
+{% else %}
+    <p>Por favor, seleccione un año y mes para ver el reporte de costos.</p>
+{% endif %}
+
+<hr style="margin-top: 30px; margin-bottom: 20px;">
+
+<h4>Costos de Meses Anteriores (Pedidos Recibidos)</h4>
+{% if meses_disponibles %}
+    <table>
+        <thead>
+            <tr>
+                <th>Año</th>
+                <th>Mes</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m_info in meses_disponibles %}
+            <tr>
+                <td>{{ m_info.anio }}</td>
+                <td>{{ (request.state.py_date(m_info.anio, m_info.mes, 1)).strftime('%B').capitalize() }} ({{ '%02d' % m_info.mes }})</td>
+                <td>
+                    <a href="{{ url_for('reporte_costos_mensuales') }}?anio={{ m_info.anio }}&mes={{ m_info.mes }}">Ver Costo</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No hay datos de pedidos recibidos para mostrar un historial de costos.</p>
+{% endif %}
+
+{# Necesitamos pasar py_date a las plantillas globales si no está ya disponible #}
+{# Esto se puede hacer al configurar Jinja2Templates en main_web.py #}
+{# templates.env.globals['py_date'] = py_date #}
+
+{% endblock %}

@@ -197,9 +197,60 @@ def calcular_costo_total_pedido(db: Session, pedido_id: int) -> float:
     # Pero como Pedido tiene la relación 'detalles', SQLAlchemy los cargará al acceder.
 
     costo_total = 0.0
-    for detalle in pedido.detalles: # Acceder a pedido.detalles cargará los detalles si no lo están ya
-        costo_total += detalle.subtotal_detalle # Usando la property del modelo DetallePedido
+    if pedido and pedido.detalles: # Asegurarse de que pedido y pedido.detalles no son None
+        for detalle in pedido.detalles:
+            costo_total += detalle.subtotal_detalle
     return costo_total
+
+# --- Funciones para Reportes ---
+
+def obtener_costos_pedidos_por_mes_anio(db: Session, anio: int, mes: int, estado_filtro: Optional[models.EstadoPedido] = models.EstadoPedido.RECIBIDO) -> float:
+    """
+    Calcula el costo total de los pedidos para un mes y año específicos,
+    opcionalmente filtrando por estado del pedido (por defecto 'RECIBIDO').
+    """
+    query = db.query(models.Pedido).filter(
+        func.extract('year', models.Pedido.fecha_pedido) == anio,
+        func.extract('month', models.Pedido.fecha_pedido) == mes
+    )
+    if estado_filtro:
+        query = query.filter(models.Pedido.estado == estado_filtro)
+
+    pedidos_del_mes = query.all()
+
+    costo_total_mes = 0.0
+    for pedido in pedidos_del_mes:
+        costo_total_mes += calcular_costo_total_pedido(db, pedido.id) # Reutilizamos la función existente
+
+    return costo_total_mes
+
+def obtener_meses_con_pedidos(db: Session, estado_filtro: Optional[models.EstadoPedido] = models.EstadoPedido.RECIBIDO) -> List[dict]:
+    """
+    Obtiene una lista de diccionarios {'anio': anio, 'mes': mes} para los cuales
+    existen pedidos, opcionalmente filtrando por estado (por defecto 'RECIBIDO').
+    Los resultados se devuelven ordenados por año y mes descendente.
+    """
+    query = db.query(
+        func.extract('year', models.Pedido.fecha_pedido).label('anio'),
+        func.extract('month', models.Pedido.fecha_pedido).label('mes')
+    ).distinct()
+
+    if estado_filtro:
+        query = query.filter(models.Pedido.estado == estado_filtro)
+
+    # Ordenar por año descendente, luego por mes descendente
+    resultados = query.order_by(
+        func.extract('year', models.Pedido.fecha_pedido).desc(),
+        func.extract('month', models.Pedido.fecha_pedido).desc()
+    ).all()
+
+    # Convertir los resultados (Row objects) a una lista de diccionarios
+    meses_disponibles = []
+    for row in resultados:
+        meses_disponibles.append({'anio': int(row.anio), 'mes': int(row.mes)})
+
+    return meses_disponibles
+
 
 # --- Funciones CRUD para DetallePedido ---
 

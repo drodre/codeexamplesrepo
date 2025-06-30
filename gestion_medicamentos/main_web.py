@@ -25,6 +25,7 @@ app = FastAPI(title="Gestor de Medicamentos Caseros - Web", version="0.1.0")
 current_dir = os.path.dirname(os.path.abspath(__file__))
 templates_dir = os.path.join(current_dir, "web", "templates")
 templates = Jinja2Templates(directory=templates_dir)
+templates.env.globals['py_date'] = py_date # Hacer py_date (datetime.date) accesible en todas las plantillas
 
 # --- Dependencia de Sesión de BD ---
 def get_db_session_fastapi():
@@ -738,6 +739,46 @@ async def detalle_pedido_ruta(request: Request, pedido_id: int, db: Session = De
     return templates.TemplateResponse("detalle_pedido.html", {
         "request": request, "pedido": pedido, "detalles_pedido": detalles_pedido,
         "costo_total": costo_total, "title": f"Detalle Pedido #{pedido.id}"
+    })
+
+# --- Rutas para Reportes ---
+@app.get("/reportes/costos-mensuales/", name="reporte_costos_mensuales")
+async def reporte_costos_mensuales(
+    request: Request,
+    anio: Optional[int] = None, # Query param
+    mes: Optional[int] = None,   # Query param
+    db: Session = Depends(get_db_session_fastapi)
+):
+    meses_disponibles = crud.obtener_meses_con_pedidos(db) # Por defecto, para pedidos RECIBIDOS
+
+    costo_calculado = None
+    mes_seleccionado_info = None
+
+    if anio is not None and mes is not None:
+        # Validar que el mes y año sean razonables (básico)
+        if not (1 <= mes <= 12 and 2000 <= anio <= py_date.today().year + 5):
+            # Manejar error o simplemente no calcular
+            pass # Opcionalmente, añadir un error a un contexto para la plantilla
+        else:
+            costo_calculado = crud.obtener_costos_pedidos_por_mes_anio(db, anio=anio, mes=mes)
+            # Para mostrar el nombre del mes en la plantilla
+            try:
+                nombre_mes = py_date(anio, mes, 1).strftime('%B') # Nombre completo del mes
+                mes_seleccionado_info = {"anio": anio, "mes_num": mes, "nombre_mes": nombre_mes.capitalize()}
+            except ValueError: # Fecha inválida (ej. mes 13)
+                 pass # ya validado arriba, pero por si acaso
+
+    # Si no se selecciona anio/mes, podríamos mostrar todos los meses o un mensaje.
+    # Por ahora, la plantilla manejará si costo_calculado es None.
+
+    return templates.TemplateResponse("reporte_costos_mensuales.html", {
+        "request": request,
+        "meses_disponibles": meses_disponibles, # Para los selectores del formulario
+        "anio_seleccionado": anio,
+        "mes_seleccionado": mes,
+        "mes_seleccionado_info": mes_seleccionado_info,
+        "costo_calculado": costo_calculado,
+        "title": "Reporte de Costos Mensuales de Pedidos"
     })
 
 
