@@ -28,19 +28,30 @@ class MedicamentoSchema(MedicamentoBase):
 
 # --- LoteStock Schemas ---
 class LoteStockBase(BaseModel):
-    medicamento_id: int
+    # medicamento_id no se incluye aquí porque vendrá de la URL al crear/editar lotes para un medicamento específico.
+    # Se añadirá en la lógica CRUD si es necesario pasarlo al modelo SQLAlchemy.
     cantidad_cajas: int
     unidades_por_caja_lote: int
-    fecha_compra_lote: date # Hacerla opcional si el modelo tiene default? Modelo tiene default.
-    fecha_vencimiento_lote: date
+    fecha_compra_lote: Optional[date] = None # El modelo SQL tiene default=func.current_date()
+    fecha_vencimiento_lote: date # Esta sí es obligatoria al crear un lote
     precio_compra_lote_por_caja: Optional[float] = None
 
 class LoteStockCreate(LoteStockBase):
-    fecha_compra_lote: Optional[date] = None # Coincide con el default del modelo SQL
+    # Este schema se usará para validar los datos del formulario.
+    # medicamento_id se pasará por separado a la función crud.
+    pass
 
-class LoteStockSchema(LoteStockBase):
+class LoteStockUpdate(BaseModel): # Usar BaseModel para flexibilidad total en actualización
+    cantidad_cajas: Optional[int] = None
+    unidades_por_caja_lote: Optional[int] = None
+    fecha_compra_lote: Optional[date] = None
+    fecha_vencimiento_lote: Optional[date] = None
+    precio_compra_lote_por_caja: Optional[float] = None
+
+class LoteStockSchema(LoteStockBase): # Hereda los campos de LoteStockBase
     id: int
-    # medicamento: MedicamentoSchema # Descomentar si es necesario en respuestas
+    medicamento_id: int # Incluir para referencia al mostrar
+    # medicamento: Optional[MedicamentoSchema] = None # Para mostrar info del medicamento al que pertenece, si se carga la relación
 
     class Config:
         orm_mode = True

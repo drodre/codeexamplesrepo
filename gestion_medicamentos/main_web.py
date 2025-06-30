@@ -474,6 +474,259 @@ async def eliminar_detalle_pedido_submit(
         raise HTTPException(status_code=500, detail=f"Error inesperado al eliminar el ítem del pedido: {e}")
 
 
+# --- CRUD Lotes de Stock ---
+@app.get("/medicamentos/{medicamento_id}/lotes/nuevo/", name="crear_lote_form")
+async def crear_lote_form(request: Request, medicamento_id: int, db: Session = Depends(get_db_session_fastapi)):
+    medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
+    if not medicamento:
+        raise HTTPException(status_code=404, detail="Medicamento no encontrado para añadir lote.")
+
+    return templates.TemplateResponse("form_lote.html", {
+        "request": request,
+        "form_title": f"Añadir Nuevo Lote para: {medicamento.nombre}",
+        "form_action": request.url_for("crear_lote_submit", medicamento_id=medicamento_id),
+        "medicamento_info": medicamento, # Para mostrar info del medicamento y pre-rellenar unidades/caja
+        "lote": None, # No hay lote existente
+        "today_date_iso": py_date.today().isoformat(),
+        "errors": None
+    })
+
+@app.post("/medicamentos/{medicamento_id}/lotes/nuevo/", name="crear_lote_submit")
+async def crear_lote_submit(
+    request: Request,
+    medicamento_id: int,
+    cantidad_cajas: int = Form(...),
+    unidades_por_caja_lote: int = Form(...),
+    fecha_compra_lote_str: Optional[str] = Form(None, alias="fecha_compra_lote"),
+    fecha_vencimiento_lote_str: str = Form(..., alias="fecha_vencimiento_lote"),
+    precio_compra_lote_por_caja: Optional[float] = Form(None),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
+    if not medicamento:
+        # Esto no debería ocurrir si el GET funcionó, pero es una salvaguarda.
+        raise HTTPException(status_code=404, detail="Medicamento no encontrado para añadir lote.")
+
+    errors = []
+    # Para repopular el formulario en caso de error
+    form_data_repop = {
+        "cantidad_cajas": cantidad_cajas, "unidades_por_caja_lote": unidades_por_caja_lote,
+        "fecha_compra_lote_str_form": fecha_compra_lote_str if fecha_compra_lote_str else py_date.today().isoformat(), # Para repopular input date
+        "fecha_vencimiento_lote_str_form": fecha_vencimiento_lote_str,
+        "precio_compra_lote_por_caja": precio_compra_lote_por_caja
+    }
+
+    fecha_compra_obj: Optional[py_date] = None
+    if fecha_compra_lote_str:
+        try: fecha_compra_obj = py_date.fromisoformat(fecha_compra_lote_str)
+        except ValueError: errors.append({"loc": ["fecha_compra_lote"], "msg": "Formato de fecha de compra inválido. Use YYYY-MM-DD."})
+    else: # Si no se provee, el modelo SQL usará la fecha actual. Pydantic schema lo tiene como Optional.
+        fecha_compra_obj = None # Se pasará None al schema, que lo permitirá.
+
+    fecha_vencimiento_obj: Optional[py_date] = None
+    if fecha_vencimiento_lote_str:
+        try: fecha_vencimiento_obj = py_date.fromisoformat(fecha_vencimiento_lote_str)
+        except ValueError: errors.append({"loc": ["fecha_vencimiento_lote"], "msg": "Formato de fecha de vencimiento inválido. Use YYYY-MM-DD."})
+    else: # Fecha de vencimiento es obligatoria
+        errors.append({"loc": ["fecha_vencimiento_lote"], "msg": "La fecha de vencimiento es obligatoria."})
+
+    if cantidad_cajas <=0: errors.append({"loc": ["cantidad_cajas"], "msg": "Cantidad de cajas debe ser positiva."})
+    if unidades_por_caja_lote <=0: errors.append({"loc": ["unidades_por_caja_lote"], "msg": "Unidades por caja debe ser positivo."})
+
+
+    if errors:
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Añadir Nuevo Lote para: {medicamento.nombre}",
+            "form_action": request.url_for("crear_lote_submit", medicamento_id=medicamento_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=422)
+
+    try:
+        lote_data = schemas.LoteStockCreate(
+            cantidad_cajas=cantidad_cajas, unidades_por_caja_lote=unidades_por_caja_lote,
+            fecha_compra_lote=fecha_compra_obj, # Puede ser None, el modelo SQL se encarga del default
+            fecha_vencimiento_lote=fecha_vencimiento_obj, # Debe ser un objeto date aquí
+            precio_compra_lote_por_caja=precio_compra_lote_por_caja
+            # medicamento_id se pasa directamente a la función crud
+        )
+    except ValidationError as e:
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Añadir Nuevo Lote para: {medicamento.nombre}",
+            "form_action": request.url_for("crear_lote_submit", medicamento_id=medicamento_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": e.errors()
+        }, status_code=422)
+
+    try:
+        crud.agregar_lote_stock(
+            db=db, medicamento_id=medicamento_id,
+            cantidad_cajas=lote_data.cantidad_cajas,
+            unidades_por_caja_lote=lote_data.unidades_por_caja_lote,
+            fecha_vencimiento_lote=lote_data.fecha_vencimiento_lote, # Esta es obligatoria
+            fecha_compra_lote=lote_data.fecha_compra_lote, # Opcional, crud se encarga si es None
+            precio_compra_lote_por_caja=lote_data.precio_compra_lote_por_caja
+        )
+        return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+    except ValueError as ve: # Por ejemplo, si el medicamento_id no existe en la función crud
+        errors.append({"loc": ["medicamento_id"], "msg": str(ve)})
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Añadir Nuevo Lote para: {medicamento.nombre}",
+            "form_action": request.url_for("crear_lote_submit", medicamento_id=medicamento_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=400)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al guardar el lote: {e}"})
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Añadir Nuevo Lote para: {medicamento.nombre}",
+            "form_action": request.url_for("crear_lote_submit", medicamento_id=medicamento_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=500)
+
+@app.get("/lotes/{lote_id}/editar/", name="editar_lote_form")
+async def editar_lote_form(request: Request, lote_id: int, db: Session = Depends(get_db_session_fastapi)):
+    lote = crud.obtener_lote_stock(db, lote_id=lote_id)
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado.")
+
+    medicamento = crud.obtener_medicamento(db, medicamento_id=lote.medicamento_id) # Necesario para el título y 'Cancelar'
+    if not medicamento: # Muy improbable si el lote existe, pero por seguridad
+        raise HTTPException(status_code=404, detail="Medicamento asociado al lote no encontrado.")
+
+    return templates.TemplateResponse("form_lote.html", {
+        "request": request,
+        "form_title": f"Editar Lote #{lote.id} para: {medicamento.nombre}",
+        "form_action": request.url_for("editar_lote_submit", lote_id=lote_id),
+        "medicamento_info": medicamento, # Para el contexto de unidades/caja y el enlace de cancelar
+        "lote": lote, # Pasar el lote existente para pre-rellenar
+        "today_date_iso": py_date.today().isoformat(), # Aunque las fechas del lote deberían existir
+        "errors": None
+    })
+
+@app.post("/lotes/{lote_id}/editar/", name="editar_lote_submit")
+async def editar_lote_submit(
+    request: Request,
+    lote_id: int,
+    cantidad_cajas: int = Form(...),
+    unidades_por_caja_lote: int = Form(...),
+    fecha_compra_lote_str: str = Form(..., alias="fecha_compra_lote"), # La fecha de compra es obligatoria en el form de edición
+    fecha_vencimiento_lote_str: str = Form(..., alias="fecha_vencimiento_lote"),
+    precio_compra_lote_por_caja: Optional[float] = Form(None),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    lote_original = crud.obtener_lote_stock(db, lote_id=lote_id)
+    if not lote_original:
+        raise HTTPException(status_code=404, detail="Lote no encontrado para actualizar.")
+
+    medicamento = crud.obtener_medicamento(db, medicamento_id=lote_original.medicamento_id) # Para re-renderizar si hay error
+
+    errors = []
+    form_data_repop = { # Para repopular el formulario
+        "id": lote_id, # Para que la plantilla sepa que es edición
+        "cantidad_cajas": cantidad_cajas, "unidades_por_caja_lote": unidades_por_caja_lote,
+        "fecha_compra_lote": fecha_compra_lote_str, # Pasar el string original
+        "fecha_vencimiento_lote": fecha_vencimiento_lote_str,
+        "precio_compra_lote_por_caja": precio_compra_lote_por_caja
+    }
+
+    fecha_compra_obj: Optional[py_date] = None
+    if fecha_compra_lote_str:
+        try: fecha_compra_obj = py_date.fromisoformat(fecha_compra_lote_str)
+        except ValueError: errors.append({"loc": ["fecha_compra_lote"], "msg": "Formato de fecha de compra inválido. Use YYYY-MM-DD."})
+    else: errors.append({"loc": ["fecha_compra_lote"], "msg": "Fecha de compra es obligatoria para editar."})
+
+
+    fecha_vencimiento_obj: Optional[py_date] = None
+    if fecha_vencimiento_lote_str:
+        try: fecha_vencimiento_obj = py_date.fromisoformat(fecha_vencimiento_lote_str)
+        except ValueError: errors.append({"loc": ["fecha_vencimiento_lote"], "msg": "Formato de fecha de vencimiento inválido. Use YYYY-MM-DD."})
+    else: errors.append({"loc": ["fecha_vencimiento_lote"], "msg": "Fecha de vencimiento es obligatoria para editar."})
+
+    if cantidad_cajas <=0: errors.append({"loc": ["cantidad_cajas"], "msg": "Cantidad de cajas debe ser positiva."})
+    if unidades_por_caja_lote <=0: errors.append({"loc": ["unidades_por_caja_lote"], "msg": "Unidades por caja debe ser positivo."})
+
+    if errors:
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Editar Lote #{lote_id} para: {medicamento.nombre}",
+            "form_action": request.url_for("editar_lote_submit", lote_id=lote_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=422)
+
+    try:
+        # Usamos LoteStockUpdate que tiene todos los campos opcionales.
+        # La función crud.actualizar_lote_stock tomará solo los campos que se le pasen.
+        lote_data_update = schemas.LoteStockUpdate(
+            cantidad_cajas=cantidad_cajas, unidades_por_caja_lote=unidades_por_caja_lote,
+            fecha_compra_lote=fecha_compra_obj,
+            fecha_vencimiento_lote=fecha_vencimiento_obj,
+            precio_compra_lote_por_caja=precio_compra_lote_por_caja
+        )
+    except ValidationError as e: # Otros errores de Pydantic
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Editar Lote #{lote_id} para: {medicamento.nombre}",
+            "form_action": request.url_for("editar_lote_submit", lote_id=lote_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": e.errors()
+        }, status_code=422)
+
+    try:
+        update_data_dict = lote_data_update.dict(exclude_unset=True)
+
+        # Manejo especial para que un precio vacío signifique None
+        if precio_compra_lote_por_caja is None and 'precio_compra_lote_por_caja' not in update_data_dict and lote_original.precio_compra_lote_por_caja is not None:
+            update_data_dict['precio_compra_lote_por_caja'] = None
+
+        if not update_data_dict: # Si no hay cambios efectivos
+             return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=lote_original.medicamento_id), status_code=303)
+
+        crud.actualizar_lote_stock(db, lote_id=lote_id, datos_actualizacion=update_data_dict)
+        return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=lote_original.medicamento_id), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al actualizar el lote: {e}"})
+        return templates.TemplateResponse("form_lote.html", {
+            "request": request, "form_title": f"Editar Lote #{lote_id} para: {medicamento.nombre}",
+            "form_action": request.url_for("editar_lote_submit", lote_id=lote_id),
+            "medicamento_info": medicamento, "lote": form_data_repop,
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=500)
+
+@app.get("/lotes/{lote_id}/eliminar/", name="eliminar_lote_confirm_form")
+async def eliminar_lote_confirm_form(request: Request, lote_id: int, db: Session = Depends(get_db_session_fastapi)):
+    lote = crud.obtener_lote_stock(db, lote_id=lote_id)
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado.")
+    medicamento = crud.obtener_medicamento(db, medicamento_id=lote.medicamento_id)
+    if not medicamento: # Improbable, pero por si acaso
+         raise HTTPException(status_code=404, detail="Medicamento asociado al lote no encontrado.")
+
+    return templates.TemplateResponse("confirmar_eliminacion_lote.html", {
+        "request": request,
+        "lote": lote,
+        "medicamento_info": medicamento,
+        "title": f"Confirmar Eliminación Lote #{lote.id}"
+    })
+
+@app.post("/lotes/{lote_id}/eliminar/", name="eliminar_lote_submit")
+async def eliminar_lote_submit(request: Request, lote_id: int, db: Session = Depends(get_db_session_fastapi)):
+    lote_a_eliminar = crud.obtener_lote_stock(db, lote_id=lote_id)
+    if not lote_a_eliminar:
+        raise HTTPException(status_code=404, detail="Lote no encontrado para eliminar.")
+
+    medicamento_id_original = lote_a_eliminar.medicamento_id # Guardar antes de eliminar
+
+    try:
+        eliminado = crud.eliminar_lote_stock(db, lote_id=lote_id)
+        if not eliminado:
+             raise HTTPException(status_code=500, detail=f"No se pudo eliminar el lote ID {lote_id}.")
+
+        return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id_original), status_code=303)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar el lote: {e}")
+
+
 # Esta ruta debe ir DESPUÉS de las rutas CRUD de pedidos para evitar conflictos
 @app.get("/pedidos/{pedido_id}/", name="detalle_pedido_ruta")
 async def detalle_pedido_ruta(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
