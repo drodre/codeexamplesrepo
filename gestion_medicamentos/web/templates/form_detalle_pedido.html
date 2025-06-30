@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Añadir Ítem al Pedido #{{ pedido_id }} - Gestor de Medicamentos{% endblock %}
+
+{% block content %}
+<h2>Añadir Ítem al Pedido #{{ pedido_id }}</h2>
+
+<form method="post" action="{{ url_for('crear_detalle_pedido_submit', pedido_id=pedido_id) }}">
+    <div>
+        <label for="medicamento_id">Medicamento:</label>
+        <select id="medicamento_id" name="medicamento_id" required>
+            <option value="">Seleccione un medicamento...</option>
+            {% for med in medicamentos_disponibles %}
+            <option value="{{ med.id }}">{{ med.nombre }} ({{ med.marca if med.marca else 'N/A' }} - {{ med.unidades_por_caja }} uds/caja)</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <label for="cantidad_cajas_pedidas">Cantidad de Cajas Pedidas:</label>
+        <input type="number" id="cantidad_cajas_pedidas" name="cantidad_cajas_pedidas" value="1" required min="1">
+    </div>
+
+    <div style="margin-top: 10px;">
+        <label for="precio_unitario_compra_caja">Precio de Compra por Caja (Opcional):</label>
+        <input type="number" id="precio_unitario_compra_caja" name="precio_unitario_compra_caja" step="0.01" min="0">
+        <small>Si se deja vacío, no se registrará un precio específico para este ítem en el pedido.</small>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <button type="submit">Añadir Ítem al Pedido</button>
+        <a href="{{ url_for('detalle_pedido_ruta', pedido_id=pedido_id) }}" style="margin-left: 10px;">Cancelar y Volver al Pedido</a>
+    </div>
+</form>
+
+{% if errors %}
+    <div style="margin-top: 20px; color: red;">
+        <h4>Errores de validación:</h4>
+        <ul>
+            {% for error in errors %}
+                <li>
+                    {% if error.loc|length > 1 %}
+                        {{ error.loc[1] }}
+                    {% elif error.loc %}
+                        {{ error.loc[0] }}
+                    {% else %}
+                        General
+                    {% endif %}
+                    : {{ error.msg }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+{% endblock %}
