@@ -781,6 +781,36 @@ async def reporte_costos_mensuales(
         "title": "Reporte de Costos Mensuales de Pedidos"
     })
 
+# --- Ruta para Vista de Stock Global ---
+@app.get("/stock/", name="vista_stock_global")
+async def vista_stock_global(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    medicamentos = crud.obtener_medicamentos(db, limit=1000)
+    stock_info_list = []
+    valor_total_stock_general = 0.0
+
+    for med in medicamentos:
+        stock_total_unidades = crud.calcular_stock_total_unidades(db, med.id)
+        valor_stock_medicamento = None
+        if med.precio_por_caja_referencia is not None and med.unidades_por_caja > 0:
+            precio_por_unidad = med.precio_por_caja_referencia / med.unidades_por_caja
+            valor_stock_medicamento = stock_total_unidades * precio_por_unidad
+            valor_total_stock_general += valor_stock_medicamento
+
+        stock_info_list.append({
+            "nombre": med.nombre,
+            "marca": med.marca,
+            "stock_total_unidades": stock_total_unidades,
+            "valor_stock_medicamento": valor_stock_medicamento,
+            "id": med.id
+        })
+
+    return templates.TemplateResponse("vista_stock_global.html", {
+        "request": request,
+        "stock_info_list": stock_info_list,
+        "valor_total_stock_general": valor_total_stock_general,
+        "title": "Vista Global de Stock"
+    })
+
 
 if __name__ == "__main__":
     print("Para ejecutar esta aplicación web, use el comando:")

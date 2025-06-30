@@ -7,8 +7,9 @@
 <p>Esta aplicación le permite llevar un control de los medicamentos en su hogar.</p>
 <p>Utilice la navegación para acceder a las diferentes secciones:</p>
 <ul>
-    <li><a href="/medicamentos/">Ver Medicamentos</a> - Listar y gestionar los medicamentos existentes.</li>
-    {# <li><a href="/pedidos/">Ver Pedidos</a> - Gestionar los pedidos de medicamentos.</li> #}
+    <li><a href="{{ url_for('listar_todos_medicamentos') }}">Ver Medicamentos</a> - Listar y gestionar los medicamentos existentes.</li>
+    <li><a href="{{ url_for('listar_todos_pedidos') }}">Ver Pedidos</a> - Gestionar los pedidos de medicamentos.</li>
+    <li><a href="{{ url_for('vista_stock_global') }}">Ver Stock Global</a> - Consultar el stock total y su valor.</li>
 </ul>
 <p>Actualmente, esta interfaz web se enfoca en la visualización de datos. La gestión (añadir, editar, eliminar) se realiza a través de la <a href="https://github.com/nombre_usuario/nombre_repo/blob/main/gestion_medicamentos/README.md#ejecuci%C3%B3n-de-la-aplicaci%C3%B3n-cli" target="_blank">interfaz de línea de comandos (CLI)</a>.</p>
 {% endblock %}
