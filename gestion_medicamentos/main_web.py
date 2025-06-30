@@ -423,4 +423,4 @@ if __name__ == "__main__":
     print("uvicorn gestion_medicamentos.main_web:app --reload --port 8000")
     print(f"Asegúrese de estar en el directorio raíz del repositorio ('{os.path.dirname(current_dir)}') al ejecutar uvicorn.")
 
-[end of gestion_medicamentos/main_web.py]
+
