@@ -276,45 +276,179 @@ async def detalle_medicamento(request: Request, medicamento_id: int, db: Session
         "title": f"Detalle: {medicamento.nombre}"
     })
 
+# --- Rutas para Pedidos (Visualización y CRUD de encabezado) ---
 @app.get("/pedidos/", name="listar_todos_pedidos")
 async def listar_todos_pedidos(request: Request, db: Session = Depends(get_db_session_fastapi)):
     pedidos = crud.obtener_pedidos(db, limit=1000)
-
     pedidos_info = []
     for p in pedidos:
         costo_total = crud.calcular_costo_total_pedido(db, p.id)
-        pedidos_info.append({
-            "pedido": p,
-            "costo_total": costo_total
-        })
+        pedidos_info.append({"pedido": p, "costo_total": costo_total})
+    return templates.TemplateResponse("lista_pedidos.html", {"request": request, "pedidos_info": pedidos_info, "title": "Lista de Pedidos"})
 
-    return templates.TemplateResponse("lista_pedidos.html", {
+@app.get("/pedidos/nuevo/", name="crear_pedido_form")
+async def crear_pedido_form(request: Request):
+    from datetime import date as py_date
+    return templates.TemplateResponse("form_pedido.html", {
         "request": request,
-        "pedidos_info": pedidos_info,
-        "title": "Lista de Pedidos"
+        "form_title": "Crear Nuevo Pedido",
+        "form_action": request.url_for("crear_pedido_submit"),
+        "pedido": None,
+        "estados_posibles": list(schemas.EstadoPedidoEnum),
+        "today_date_iso": py_date.today().isoformat(),
+        "errors": None
     })
 
-@app.get("/pedidos/{pedido_id}/", name="detalle_pedido")
+@app.post("/pedidos/nuevo/", name="crear_pedido_submit")
+async def crear_pedido_submit(
+    request: Request,
+    fecha_pedido_str: Optional[str] = Form(None, alias="fecha_pedido"),
+    proveedor: Optional[str] = Form(None),
+    estado: schemas.EstadoPedidoEnum = Form(schemas.EstadoPedidoEnum.PENDIENTE),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    errors = []
+    from datetime import date as py_date
+    fecha_pedido_obj: Optional[py_date] = None
+    if fecha_pedido_str:
+        try:
+            fecha_pedido_obj = py_date.fromisoformat(fecha_pedido_str)
+        except ValueError:
+            errors.append({"loc": ["fecha_pedido"], "msg": "Formato de fecha inválido. Use YYYY-MM-DD."})
+    else:
+        fecha_pedido_obj = py_date.today()
+
+    if errors:
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request, "form_title": "Crear Nuevo Pedido",
+            "form_action": request.url_for("crear_pedido_submit"),
+            "pedido": {"proveedor": proveedor, "estado": estado},
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=422)
+
+    try:
+        pedido_data = schemas.PedidoCreate(fecha_pedido=fecha_pedido_obj, proveedor=proveedor, estado=estado)
+    except ValidationError as e:
+        current_form_data = {"fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else py_date.today().isoformat(), "proveedor": proveedor, "estado": estado.value}
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request, "form_title": "Crear Nuevo Pedido",
+            "form_action": request.url_for("crear_pedido_submit"), "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": py_date.today().isoformat(), "errors": e.errors()
+        }, status_code=422)
+
+    try:
+        pedido = crud.crear_pedido(db=db, fecha_pedido=pedido_data.fecha_pedido, proveedor=pedido_data.proveedor, estado=pedido_data.estado)
+        return RedirectResponse(url=request.url_for("detalle_pedido_ruta", pedido_id=pedido.id), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al guardar el pedido: {e}"})
+        current_form_data = {"fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else py_date.today().isoformat(), "proveedor": proveedor, "estado": estado.value}
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request, "form_title": "Crear Nuevo Pedido",
+            "form_action": request.url_for("crear_pedido_submit"), "pedido": current_form_data,
+            "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": py_date.today().isoformat(), "errors": errors
+        }, status_code=500)
+
+@app.get("/pedidos/{pedido_id}/editar/", name="editar_pedido_form")
+async def editar_pedido_form(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado")
+    from datetime import date as py_date
+    return templates.TemplateResponse("form_pedido.html", {
+        "request": request, "form_title": f"Editar Pedido #{pedido.id}",
+        "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+        "pedido": pedido, "estados_posibles": list(schemas.EstadoPedidoEnum),
+        "today_date_iso": pedido.fecha_pedido.isoformat() if pedido.fecha_pedido else py_date.today().isoformat(), "errors": None
+    })
+
+@app.post("/pedidos/{pedido_id}/editar/", name="editar_pedido_submit")
+async def editar_pedido_submit(
+    request: Request, pedido_id: int, fecha_pedido_str: str = Form(..., alias="fecha_pedido"),
+    proveedor: Optional[str] = Form(None), estado: schemas.EstadoPedidoEnum = Form(...),
+    db: Session = Depends(get_db_session_fastapi)
+):
+    errors = []
+    pedido_original = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido_original:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado para actualizar")
+    from datetime import date as py_date
+    fecha_pedido_obj: Optional[py_date] = None
+    try:
+        fecha_pedido_obj = py_date.fromisoformat(fecha_pedido_str)
+    except ValueError:
+        errors.append({"loc": ["fecha_pedido"], "msg": "Formato de fecha inválido. Use YYYY-MM-DD."})
+
+    if errors:
+        current_form_data = {"id": pedido_id, "fecha_pedido": fecha_pedido_str, "proveedor": proveedor, "estado": estado}
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request, "form_title": f"Editar Pedido #{pedido_id}",
+            "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+            "pedido": current_form_data, "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": fecha_pedido_str, "errors": errors
+        }, status_code=422)
+
+    try:
+        pedido_data_update = schemas.PedidoUpdate(fecha_pedido=fecha_pedido_obj, proveedor=proveedor, estado=estado)
+    except ValidationError as e:
+        current_form_data = {"id": pedido_id, "fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None, "proveedor": proveedor, "estado": estado}
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request, "form_title": f"Editar Pedido #{pedido_id}",
+            "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+            "pedido": current_form_data, "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None, "errors": e.errors()
+        }, status_code=422)
+
+    try:
+        update_data_dict = pedido_data_update.dict(exclude_unset=True)
+        if proveedor == "": update_data_dict['proveedor'] = None
+        elif proveedor is None and 'proveedor' not in update_data_dict and pedido_original.proveedor is not None:
+             update_data_dict['proveedor'] = None
+        if not update_data_dict:
+            return RedirectResponse(url=request.url_for("detalle_pedido_ruta", pedido_id=pedido_id), status_code=303)
+        crud.actualizar_pedido(db, pedido_id=pedido_id, datos_actualizacion=update_data_dict)
+        return RedirectResponse(url=request.url_for("detalle_pedido_ruta", pedido_id=pedido_id), status_code=303)
+    except Exception as e:
+        errors.append({"loc": ["general"], "msg": f"Error inesperado al actualizar el pedido: {e}"})
+        current_form_data = {"id": pedido_id, "fecha_pedido": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None, "proveedor": proveedor, "estado": estado}
+        return templates.TemplateResponse("form_pedido.html", {
+            "request": request, "form_title": f"Editar Pedido #{pedido_id}",
+            "form_action": request.url_for("editar_pedido_submit", pedido_id=pedido_id),
+            "pedido": current_form_data, "estados_posibles": list(schemas.EstadoPedidoEnum),
+            "today_date_iso": fecha_pedido_obj.isoformat() if fecha_pedido_obj else None, "errors": errors
+        }, status_code=500)
+
+@app.get("/pedidos/{pedido_id}/eliminar/", name="eliminar_pedido_confirm_form")
+async def eliminar_pedido_confirm_form(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado")
+    return templates.TemplateResponse("confirmar_eliminacion_pedido.html", {"request": request, "pedido": pedido, "title": f"Confirmar Eliminación Pedido #{pedido.id}"})
+
+@app.post("/pedidos/{pedido_id}/eliminar/", name="eliminar_pedido_submit")
+async def eliminar_pedido_submit(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
+    pedido_a_eliminar = crud.obtener_pedido(db, pedido_id=pedido_id)
+    if not pedido_a_eliminar:
+        raise HTTPException(status_code=404, detail=f"Pedido con ID {pedido_id} no encontrado para eliminar")
+    try:
+        crud.eliminar_pedido(db, pedido_id=pedido_id)
+        return RedirectResponse(url=request.url_for("listar_todos_pedidos"), status_code=303)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al eliminar el pedido: {e}")
+
+# Esta ruta debe ir DESPUÉS de las rutas CRUD de pedidos para evitar conflictos
+@app.get("/pedidos/{pedido_id}/", name="detalle_pedido_ruta") # Renombrada para evitar conflicto con la variable 'detalle_pedido'
 async def detalle_pedido_ruta(request: Request, pedido_id: int, db: Session = Depends(get_db_session_fastapi)):
     pedido = crud.obtener_pedido(db, pedido_id=pedido_id)
     if not pedido:
         return templates.TemplateResponse("error_404.html", {"request": request, "detail": f"Pedido con ID {pedido_id} no encontrado"}, status_code=404)
-
     detalles_pedido = crud.obtener_detalles_por_pedido(db, pedido_id=pedido_id)
-    costo_total = crud.calcular_costo_total_pedido(db, pedido_id=pedido_id) # Ya se calcula en la plantilla, pero útil tenerlo aquí
-
-    # Para mostrar el nombre del medicamento en los detalles del pedido,
-    # nos aseguramos de que el objeto medicamento esté accesible.
-    # crud.obtener_detalles_por_pedido ya debería cargar la relación si está configurada con eager loading,
-    # o se accederá por lazy loading en la plantilla. Si no, tendríamos que cargarlo explícitamente.
-    # La plantilla actual accede a detalle.medicamento.nombre, lo que implica que la relación funciona.
-
+    costo_total = crud.calcular_costo_total_pedido(db, pedido_id=pedido_id)
     return templates.TemplateResponse("detalle_pedido.html", {
-        "request": request,
-        "pedido": pedido,
-        "detalles_pedido": detalles_pedido,
-        "costo_total": costo_total,
-        "title": f"Detalle Pedido #{pedido.id}"
+        "request": request, "pedido": pedido, "detalles_pedido": detalles_pedido,
+        "costo_total": costo_total, "title": f"Detalle Pedido #{pedido.id}"
     })
 
 # --- CRUD Medicamentos ---
