@@ -14,6 +14,7 @@
             <tr>
                 <th>Medicamento</th>
                 <th>Marca</th>
+                <th>Estado</th>
                 <th class="text-right">Stock Total (Unidades)</th>
                 <th class="text-right">Valor Estimado del Stock</th>
                 <th>Acciones</th>
@@ -21,13 +22,21 @@
         </thead>
         <tbody>
             {% for item in stock_info_list %}
-            <tr>
+            <tr {% if not item.esta_activo %}style="background-color: #f9f9f9; color: #777;"{% endif %}>
                 <td>
                     <a href="{{ url_for('detalle_medicamento', medicamento_id=item.id) }}">
                         {{ item.nombre }}
                     </a>
+                    {% if not item.esta_activo %} (En Desuso){% endif %}
                 </td>
                 <td>{{ item.marca if item.marca else '-' }}</td>
+                <td>
+                    {% if item.esta_activo %}
+                        <span style="color: green;">Activo</span>
+                    {% else %}
+                        <span style="color: red;">En Desuso</span>
+                    {% endif %}
+                </td>
                 <td class="text-right">{{ item.stock_total_unidades }}</td>
                 <td class="text-right">
                     {% if item.valor_stock_medicamento is not none %}

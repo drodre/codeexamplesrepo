@@ -22,6 +22,7 @@ class Medicamento(Base):
     # fecha_ultima_compra se puede obtener del lote más reciente
     # fecha_vencimiento_proxima se puede obtener del lote con vencimiento más cercano
     precio_por_caja_referencia = Column(Float, nullable=True) # Precio de referencia o último conocido
+    esta_activo = Column(Boolean, default=True, nullable=False, server_default='t') # Asumiendo True para la mayoría de BDs
 
     lotes = relationship("LoteStock", back_populates="medicamento", cascade="all, delete-orphan")
     detalles_pedido = relationship("DetallePedido", back_populates="medicamento")

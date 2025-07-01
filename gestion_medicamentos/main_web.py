@@ -69,13 +69,31 @@ async def crear_medicamento_form(request: Request):
 async def crear_medicamento_submit(
     request: Request, nombre: str = Form(...), marca: Optional[str] = Form(None),
     unidades_por_caja: int = Form(...), precio_por_caja_referencia: Optional[float] = Form(None),
+    esta_activo_sentinel: Optional[str] = Form(None), esta_activo: Optional[str] = Form(None), # esta_activo_sentinel para saber si el campo fue enviado
     db: Session = Depends(get_db_session_fastapi)
 ):
     errors = []
-    form_data_repop = {"nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja, "precio_por_caja_referencia": precio_por_caja_referencia}
+    # Determinar el valor booleano de esta_activo
+    # Si el checkbox 'esta_activo' está marcado, el form envía 'true'. Si no, no envía nada para 'esta_activo'.
+    # El 'esta_activo_sentinel' siempre se envía, así sabemos que el form fue procesado.
+    esta_activo_bool = True if esta_activo == "true" else False
+
+    form_data_repop = {
+        "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
+        "precio_por_caja_referencia": precio_por_caja_referencia,
+        "esta_activo": esta_activo_bool # Usar el valor procesado para repopular
+    }
     try:
-        medicamento_data = schemas.MedicamentoCreate(**form_data_repop)
+        # Crear el diccionario para el schema Pydantic, incluyendo esta_activo
+        medicamento_dict_for_schema = {
+            "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
+            "precio_por_caja_referencia": precio_por_caja_referencia,
+            "esta_activo": esta_activo_bool
+        }
+        medicamento_data = schemas.MedicamentoCreate(**medicamento_dict_for_schema)
+
     except ValidationError as e:
+        # Pasar form_data_repop que incluye el valor de esta_activo como fue interpretado
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": "Añadir Nuevo Medicamento",
             "form_action": request.url_for("crear_medicamento_submit"),
@@ -91,7 +109,11 @@ async def crear_medicamento_submit(
         }, status_code=400)
 
     try:
-        crud.crear_medicamento(db=db, **medicamento_data.dict())
+        # Pasar explícitamente esta_activo a la función CRUD
+        crud.crear_medicamento(db=db, nombre=medicamento_data.nombre, marca=medicamento_data.marca,
+                               unidades_por_caja=medicamento_data.unidades_por_caja,
+                               precio_por_caja_referencia=medicamento_data.precio_por_caja_referencia,
+                               esta_activo=medicamento_data.esta_activo)
         return RedirectResponse(url=request.url_for("listar_todos_medicamentos"), status_code=303)
     except Exception as e:
         errors.append({"loc": ["general"], "msg": f"Error inesperado: {e}"})
@@ -117,6 +139,7 @@ async def editar_medicamento_submit(
     request: Request, medicamento_id: int, nombre: str = Form(...),
     marca: Optional[str] = Form(None), unidades_por_caja: int = Form(...),
     precio_por_caja_referencia: Optional[float] = Form(None),
+    esta_activo_sentinel: Optional[str] = Form(None), esta_activo: Optional[str] = Form(None),
     db: Session = Depends(get_db_session_fastapi)
 ):
     errors = []
@@ -124,9 +147,25 @@ async def editar_medicamento_submit(
     if not medicamento_original:
         raise HTTPException(status_code=404, detail="Medicamento no encontrado para actualizar")
 
-    form_data_repop = {"id": medicamento_id, "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja, "precio_por_caja_referencia": precio_por_caja_referencia}
+    esta_activo_bool = True if esta_activo == "true" else False
+
+    form_data_repop = {
+        "id": medicamento_id, "nombre": nombre, "marca": marca,
+        "unidades_por_caja": unidades_por_caja,
+        "precio_por_caja_referencia": precio_por_caja_referencia,
+        "esta_activo": esta_activo_bool # Para repopular el form si hay error
+    }
     try:
-        medicamento_data_update = schemas.MedicamentoUpdate(**form_data_repop)
+        # Crear el diccionario para el schema Pydantic, incluyendo esta_activo
+        medicamento_dict_for_schema = {
+            "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
+            "precio_por_caja_referencia": precio_por_caja_referencia,
+            "esta_activo": esta_activo_bool
+        }
+        # Usamos MedicamentoUpdate, que tiene campos opcionales.
+        # El dict() exclude_unset=True se encargará de solo enviar lo que cambió o está presente.
+        medicamento_data_update = schemas.MedicamentoUpdate(**medicamento_dict_for_schema)
+
     except ValidationError as e:
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
@@ -145,12 +184,34 @@ async def editar_medicamento_submit(
             }, status_code=400)
 
     try:
-        update_data_dict = medicamento_data_update.dict(exclude_unset=True)
+        # Construir el diccionario de actualización solo con los campos que realmente se quieren cambiar.
+        # El schema MedicamentoUpdate ya tiene esta_activo como Optional.
+        update_data_dict = medicamento_data_update.dict(exclude_unset=True) # exclude_unset es clave aquí
+
+        # Ajustes manuales si es necesario (como el manejo de string vacío para marca que ya existía)
         if marca == "": update_data_dict['marca'] = None
         if 'precio_por_caja_referencia' not in update_data_dict and precio_por_caja_referencia is None and medicamento_original.precio_por_caja_referencia is not None:
             update_data_dict['precio_por_caja_referencia'] = None
-        if not update_data_dict:
-             return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+
+        # Importante: Pydantic con exclude_unset=True no incluirá `esta_activo` si su valor es el default (None en MedicamentoUpdate).
+        # Pero nosotros queremos que se actualice a True o False según el checkbox.
+        # El medicamento_data_update ya tiene el valor correcto de esta_activo_bool.
+        # Así que lo añadimos explícitamente al diccionario si no está ya (o para asegurar que se pasa).
+        update_data_dict['esta_activo'] = esta_activo_bool
+
+
+        if not update_data_dict and esta_activo_bool == medicamento_original.esta_activo : # Si no hay cambios efectivos
+             # Comprobar si el único cambio posible era esta_activo y si este no cambió respecto al original
+             no_cambios_reales = True
+             for key, value in update_data_dict.items():
+                 if key == 'esta_activo': continue # ya lo comprobamos
+                 if getattr(medicamento_original, key) != value:
+                     no_cambios_reales = False
+                     break
+             if no_cambios_reales and esta_activo_bool == medicamento_original.esta_activo:
+                 return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+
+
         crud.actualizar_medicamento(db, medicamento_id=medicamento_id, datos_actualizacion=update_data_dict)
         return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
     except Exception as e:
@@ -801,7 +862,8 @@ async def vista_stock_global(request: Request, db: Session = Depends(get_db_sess
             "marca": med.marca,
             "stock_total_unidades": stock_total_unidades,
             "valor_stock_medicamento": valor_stock_medicamento,
-            "id": med.id
+            "id": med.id,
+            "esta_activo": med.esta_activo # Pasar el estado a la plantilla
         })
 
     return templates.TemplateResponse("vista_stock_global.html", {

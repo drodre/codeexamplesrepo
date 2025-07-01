@@ -10,6 +10,9 @@
 <p><strong>Marca:</strong> {{ medicamento.marca if medicamento.marca else 'N/A' }}</p>
 <p><strong>Unidades por Caja:</strong> {{ medicamento.unidades_por_caja }}</p>
 <p><strong>Precio de Referencia por Caja:</strong> {{ medicamento.precio_por_caja_referencia if medicamento.precio_por_caja_referencia is not none else 'N/A' }}</p>
+<p><strong>Estado:</strong> <span style="font-weight: bold; color: {% if medicamento.esta_activo %}green{% else %}red{% endif %};">
+    {% if medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}
+</span></p>
 
 <h3>Stock y Vencimiento</h3>
 <p><strong>Stock Total (Unidades Activas):</strong> {{ stock_total }}</p>

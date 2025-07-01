@@ -22,6 +22,11 @@
         <label for="precio_por_caja_referencia">Precio de Referencia por Caja (Opcional, ej. 10.50):</label>
         <input type="number" id="precio_por_caja_referencia" name="precio_por_caja_referencia" value="{{ medicamento.precio_por_caja_referencia if medicamento and medicamento.precio_por_caja_referencia is not none else '' }}" step="0.01" min="0">
     </div>
+    <div style="margin-top: 10px;">
+        <input type="checkbox" id="esta_activo" name="esta_activo" value="true" {% if medicamento is none or (medicamento and medicamento.esta_activo) %}checked{% endif %}>
+        <label for="esta_activo">Medicamento Activo (en uso)</label>
+        <input type="hidden" name="esta_activo_sentinel" value="true"> {# Para asegurar que el campo se envíe incluso si el checkbox no está marcado #}
+    </div>
 
     {# Campo oculto para el método en caso de querer simular PUT/PATCH si el framework no lo soporta nativamente con forms HTML #}
     {# {% if medicamento %} <input type="hidden" name="_method" value="PUT"> {% endif %} #}
