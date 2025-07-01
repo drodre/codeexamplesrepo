@@ -917,6 +917,15 @@ async def reporte_costos_mensuales(
         "title": "Reporte de Costos Mensuales de Pedidos"
     })
 
+@app.get("/reportes/stock-por-vencimiento/", name="reporte_stock_vencimiento")
+async def reporte_stock_por_vencimiento(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    lotes_por_vencimiento = crud.obtener_lotes_stock_ordenados_por_vencimiento(db)
+    return templates.TemplateResponse("reporte_stock_vencimiento.html", {
+        "request": request,
+        "lotes": lotes_por_vencimiento,
+        "title": "Reporte de Stock por Próximo Vencimiento"
+    })
+
 # --- Ruta para Vista de Stock Global ---
 @app.get("/stock/", name="vista_stock_global")
 async def vista_stock_global(request: Request, db: Session = Depends(get_db_session_fastapi)):

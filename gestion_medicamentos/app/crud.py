@@ -82,6 +82,24 @@ def eliminar_medicamento(db: Session, medicamento_id: int) -> bool:
         return True
     return False
 
+def obtener_lotes_stock_ordenados_por_vencimiento(db: Session) -> List[models.LoteStock]:
+    """
+    Obtiene todos los lotes de stock activos (no vencidos),
+    junto con la información del medicamento asociado,
+    ordenados por su fecha de vencimiento de forma ascendente.
+    """
+    from sqlalchemy.orm import joinedload
+
+    today = date.today()
+    return (
+        db.query(models.LoteStock)
+        .join(models.Medicamento) # Unir con Medicamento para poder acceder a sus campos
+        .options(joinedload(models.LoteStock.medicamento)) # Cargar Medicamento para evitar N+1
+        .filter(models.LoteStock.fecha_vencimiento_lote >= today)
+        .order_by(models.LoteStock.fecha_vencimiento_lote.asc())
+        .all()
+    )
+
 # --- Funciones de Utilidad/Calculadas para Medicamento ---
 
 def calcular_stock_total_unidades(db: Session, medicamento_id: int) -> int:
