@@ -80,6 +80,24 @@
     <p>No hay datos de pedidos recibidos para mostrar un historial de costos.</p>
 {% endif %}
 
+<hr style="margin-top: 40px; margin-bottom: 30px;">
+
+<h3>Otros Reportes Disponibles</h3>
+<ul class="list-unstyled">
+    <li style="margin-bottom: 10px;">
+        <a href="{{ url_for('reporte_stock_vencimiento') }}" class="btn btn-info">
+            <i class="fas fa-calendar-times"></i> Reporte de Stock por Vencimiento (Lotes)
+        </a>
+        <p class="text-muted small">Listar lotes de stock activos ordenados por próxima fecha de vencimiento.</p>
+    </li>
+    <li style="margin-bottom: 10px;">
+        <a href="{{ url_for('reporte_recetas_vencimiento') }}" class="btn btn-warning">
+            <i class="fas fa-file-prescription"></i> Reporte de Vencimiento de Recetas
+        </a>
+        <p class="text-muted small">Listar medicamentos activos con recetas próximas a vencer.</p>
+    </li>
+</ul>
+
 {# Necesitamos pasar py_date a las plantillas globales si no está ya disponible #}
 {# Esto se puede hacer al configurar Jinja2Templates en main_web.py #}
 {# templates.env.globals['py_date'] = py_date #}
