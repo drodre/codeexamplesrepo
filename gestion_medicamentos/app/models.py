@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, Float, ForeignKey, Enum as SQLAlchemyEnum
+from sqlalchemy import create_engine, Column, Integer, String, Date, Float, ForeignKey, Enum as SQLAlchemyEnum, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func # Para valores por defecto como now()
 import enum
