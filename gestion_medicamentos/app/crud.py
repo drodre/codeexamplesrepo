@@ -100,6 +100,21 @@ def obtener_lotes_stock_ordenados_por_vencimiento(db: Session) -> List[models.Lo
         .all()
     )
 
+def obtener_medicamentos_activos_por_vencimiento_receta(db: Session) -> List[models.Medicamento]:
+    """
+    Obtiene todos los medicamentos activos que tienen una fecha de vencimiento de receta,
+    ordenados por la proximidad de esta fecha de vencimiento.
+    """
+    today = date.today()
+    return (
+        db.query(models.Medicamento)
+        .filter(models.Medicamento.esta_activo == True)
+        .filter(models.Medicamento.vencimiento_receta.isnot(None))
+        .filter(models.Medicamento.vencimiento_receta >= today) # Opcional: solo mostrar recetas que aún no han vencido
+        .order_by(models.Medicamento.vencimiento_receta.asc())
+        .all()
+    )
+
 # --- Funciones de Utilidad/Calculadas para Medicamento ---
 
 def calcular_stock_total_unidades(db: Session, medicamento_id: int) -> int:

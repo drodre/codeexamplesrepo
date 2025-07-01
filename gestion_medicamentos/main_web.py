@@ -926,6 +926,16 @@ async def reporte_stock_por_vencimiento(request: Request, db: Session = Depends(
         "title": "Reporte de Stock por Próximo Vencimiento"
     })
 
+@app.get("/reportes/recetas-por-vencimiento/", name="reporte_recetas_vencimiento")
+async def reporte_recetas_por_vencimiento(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    medicamentos_por_vencimiento_receta = crud.obtener_medicamentos_activos_por_vencimiento_receta(db)
+    return templates.TemplateResponse("reporte_recetas_vencimiento.html", {
+        "request": request,
+        "medicamentos": medicamentos_por_vencimiento_receta,
+        "today": py_date.today(), # Para calcular días restantes en la plantilla
+        "title": "Reporte de Vencimiento de Recetas"
+    })
+
 # --- Ruta para Vista de Stock Global ---
 @app.get("/stock/", name="vista_stock_global")
 async def vista_stock_global(request: Request, db: Session = Depends(get_db_session_fastapi)):
