@@ -10,9 +10,13 @@
 <p><strong>Marca:</strong> {{ medicamento.marca if medicamento.marca else 'N/A' }}</p>
 <p><strong>Unidades por Caja:</strong> {{ medicamento.unidades_por_caja }}</p>
 <p><strong>Precio de Referencia por Caja:</strong> {{ medicamento.precio_por_caja_referencia if medicamento.precio_por_caja_referencia is not none else 'N/A' }}</p>
+<p><strong>Estado:</strong> <span style="font-weight: bold; color: {% if medicamento.esta_activo %}green{% else %}red{% endif %};">
+    {% if medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}
+</span></p>
+<p><strong>Vencimiento de Receta:</strong> {{ medicamento.vencimiento_receta.strftime('%d/%m/%Y') if medicamento.vencimiento_receta else 'No aplica' }}</p>
 
-<h3>Stock y Vencimiento</h3>
-<p><strong>Stock Total (Unidades Activas):</strong> {{ stock_total }}</p>
+<h3>Stock y Vencimiento de Lotes</h3>
+<p><strong>Stock Total (Unidades Activas de Lotes):</strong> {{ stock_total }}</p>
 <p><strong>Fecha de Vencimiento Próxima (Lotes Activos):</strong> {{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A' }}</p>
 
 <h3>Lotes de Stock</h3>

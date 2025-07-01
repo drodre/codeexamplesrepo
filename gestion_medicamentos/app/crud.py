@@ -12,7 +12,10 @@ from typing import List, Optional, Type # Para type hints
 
 # --- Funciones CRUD para Medicamento ---
 
-def crear_medicamento(db: Session, nombre: str, marca: Optional[str], unidades_por_caja: int, precio_por_caja_referencia: Optional[float] = None) -> models.Medicamento:
+def crear_medicamento(db: Session, nombre: str, marca: Optional[str], unidades_por_caja: int,
+                      precio_por_caja_referencia: Optional[float] = None,
+                      esta_activo: bool = True,
+                      vencimiento_receta: Optional[date] = None) -> models.Medicamento:
     """
     Crea un nuevo registro de medicamento en la base de datos.
     """
@@ -20,7 +23,9 @@ def crear_medicamento(db: Session, nombre: str, marca: Optional[str], unidades_p
         nombre=nombre,
         marca=marca,
         unidades_por_caja=unidades_por_caja,
-        precio_por_caja_referencia=precio_por_caja_referencia # Nombre de parámetro corregido
+        precio_por_caja_referencia=precio_por_caja_referencia,
+        esta_activo=esta_activo,
+        vencimiento_receta=vencimiento_receta
     )
     db.add(db_medicamento)
     db.commit()
@@ -76,6 +81,39 @@ def eliminar_medicamento(db: Session, medicamento_id: int) -> bool:
         db.commit()
         return True
     return False
+
+def obtener_lotes_stock_ordenados_por_vencimiento(db: Session) -> List[models.LoteStock]:
+    """
+    Obtiene todos los lotes de stock activos (no vencidos),
+    junto con la información del medicamento asociado,
+    ordenados por su fecha de vencimiento de forma ascendente.
+    """
+    from sqlalchemy.orm import joinedload
+
+    today = date.today()
+    return (
+        db.query(models.LoteStock)
+        .join(models.Medicamento) # Unir con Medicamento para poder acceder a sus campos
+        .options(joinedload(models.LoteStock.medicamento)) # Cargar Medicamento para evitar N+1
+        .filter(models.LoteStock.fecha_vencimiento_lote >= today)
+        .order_by(models.LoteStock.fecha_vencimiento_lote.asc())
+        .all()
+    )
+
+def obtener_medicamentos_activos_por_vencimiento_receta(db: Session) -> List[models.Medicamento]:
+    """
+    Obtiene todos los medicamentos activos que tienen una fecha de vencimiento de receta,
+    ordenados por la proximidad de esta fecha de vencimiento.
+    """
+    today = date.today()
+    return (
+        db.query(models.Medicamento)
+        .filter(models.Medicamento.esta_activo == True)
+        .filter(models.Medicamento.vencimiento_receta.isnot(None))
+        .filter(models.Medicamento.vencimiento_receta >= today) # Opcional: solo mostrar recetas que aún no han vencido
+        .order_by(models.Medicamento.vencimiento_receta.asc())
+        .all()
+    )
 
 # --- Funciones de Utilidad/Calculadas para Medicamento ---
 

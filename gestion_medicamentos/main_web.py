@@ -69,12 +69,43 @@ async def crear_medicamento_form(request: Request):
 async def crear_medicamento_submit(
     request: Request, nombre: str = Form(...), marca: Optional[str] = Form(None),
     unidades_por_caja: int = Form(...), precio_por_caja_referencia: Optional[float] = Form(None),
+    esta_activo_sentinel: Optional[str] = Form(None), esta_activo: Optional[str] = Form(None),
+    vencimiento_receta_str: Optional[str] = Form(None, alias="vencimiento_receta"),
     db: Session = Depends(get_db_session_fastapi)
 ):
     errors = []
-    form_data_repop = {"nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja, "precio_por_caja_referencia": precio_por_caja_referencia}
+    esta_activo_bool = True if esta_activo == "true" else False
+    vencimiento_receta_obj: Optional[py_date] = None
+
+    if vencimiento_receta_str:
+        try:
+            vencimiento_receta_obj = py_date.fromisoformat(vencimiento_receta_str)
+        except ValueError:
+            errors.append({"loc": ["vencimiento_receta"], "msg": "Formato de fecha de vencimiento de receta inválido. Use YYYY-MM-DD."})
+
+    form_data_repop = {
+        "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
+        "precio_por_caja_referencia": precio_por_caja_referencia,
+        "esta_activo": esta_activo_bool,
+        "vencimiento_receta": vencimiento_receta_obj # Para repopular, usar el objeto o None
+    }
+
+    if errors: # Si hubo error en la conversión de fecha, retornar antes de validar con Pydantic
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request, "form_title": "Añadir Nuevo Medicamento",
+            "form_action": request.url_for("crear_medicamento_submit"),
+            "medicamento": form_data_repop, "errors": errors # form_data_repop ya tiene la fecha como objeto si fue válida
+        }, status_code=422)
+
     try:
-        medicamento_data = schemas.MedicamentoCreate(**form_data_repop)
+        medicamento_dict_for_schema = {
+            "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
+            "precio_por_caja_referencia": precio_por_caja_referencia,
+            "esta_activo": esta_activo_bool,
+            "vencimiento_receta": vencimiento_receta_obj
+        }
+        medicamento_data = schemas.MedicamentoCreate(**medicamento_dict_for_schema)
+
     except ValidationError as e:
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": "Añadir Nuevo Medicamento",
@@ -91,7 +122,12 @@ async def crear_medicamento_submit(
         }, status_code=400)
 
     try:
-        crud.crear_medicamento(db=db, **medicamento_data.dict())
+        # Pasar explícitamente todos los campos a la función CRUD
+        crud.crear_medicamento(db=db, nombre=medicamento_data.nombre, marca=medicamento_data.marca,
+                               unidades_por_caja=medicamento_data.unidades_por_caja,
+                               precio_por_caja_referencia=medicamento_data.precio_por_caja_referencia,
+                               esta_activo=medicamento_data.esta_activo,
+                               vencimiento_receta=medicamento_data.vencimiento_receta)
         return RedirectResponse(url=request.url_for("listar_todos_medicamentos"), status_code=303)
     except Exception as e:
         errors.append({"loc": ["general"], "msg": f"Error inesperado: {e}"})
@@ -117,6 +153,8 @@ async def editar_medicamento_submit(
     request: Request, medicamento_id: int, nombre: str = Form(...),
     marca: Optional[str] = Form(None), unidades_por_caja: int = Form(...),
     precio_por_caja_referencia: Optional[float] = Form(None),
+    esta_activo_sentinel: Optional[str] = Form(None), esta_activo: Optional[str] = Form(None),
+    vencimiento_receta_str: Optional[str] = Form(None, alias="vencimiento_receta"),
     db: Session = Depends(get_db_session_fastapi)
 ):
     errors = []
@@ -124,10 +162,47 @@ async def editar_medicamento_submit(
     if not medicamento_original:
         raise HTTPException(status_code=404, detail="Medicamento no encontrado para actualizar")
 
-    form_data_repop = {"id": medicamento_id, "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja, "precio_por_caja_referencia": precio_por_caja_referencia}
+    esta_activo_bool = True if esta_activo == "true" else False
+    vencimiento_receta_obj: Optional[py_date] = None
+
+    if vencimiento_receta_str: # Si se envía algo (incluso vacío), intentar convertir
+        try:
+            vencimiento_receta_obj = py_date.fromisoformat(vencimiento_receta_str)
+        except ValueError:
+            # No añadir error aquí si el string está vacío, significa borrar la fecha
+            if vencimiento_receta_str.strip() != "":
+                errors.append({"loc": ["vencimiento_receta"], "msg": "Formato de fecha de vencimiento de receta inválido. Use YYYY-MM-DD."})
+    # Si vencimiento_receta_str es None o un string vacío, vencimiento_receta_obj será None, lo que es correcto para borrar la fecha.
+
+
+    form_data_repop = {
+        "id": medicamento_id, "nombre": nombre, "marca": marca,
+        "unidades_por_caja": unidades_por_caja,
+        "precio_por_caja_referencia": precio_por_caja_referencia,
+        "esta_activo": esta_activo_bool,
+        "vencimiento_receta": vencimiento_receta_obj # Usar el objeto para repopular
+    }
+
+    if errors: # Error de formato de fecha
+        return templates.TemplateResponse("form_medicamento.html", {
+            "request": request, "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
+            "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
+            "medicamento": form_data_repop, "errors": errors
+        }, status_code=422)
+
     try:
-        medicamento_data_update = schemas.MedicamentoUpdate(**form_data_repop)
-    except ValidationError as e:
+        medicamento_dict_for_schema = {
+            "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
+            "precio_por_caja_referencia": precio_por_caja_referencia,
+            "esta_activo": esta_activo_bool,
+            "vencimiento_receta": vencimiento_receta_obj
+        }
+        medicamento_data_update = schemas.MedicamentoUpdate(**medicamento_dict_for_schema)
+
+    except ValidationError as e: # Otros errores de Pydantic
+        # Repopular con el medicamento original para el campo de fecha si la conversión falló antes y no se llegó aquí
+        # o si el error de Pydantic es sobre otro campo.
+        # form_data_repop ya tiene el valor correcto si la fecha se procesó.
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
             "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
@@ -145,12 +220,73 @@ async def editar_medicamento_submit(
             }, status_code=400)
 
     try:
-        update_data_dict = medicamento_data_update.dict(exclude_unset=True)
+        # Construir el diccionario de actualización solo con los campos que realmente se quieren cambiar.
+        # El schema MedicamentoUpdate ya tiene esta_activo como Optional.
+        update_data_dict = medicamento_data_update.dict(exclude_unset=True) # exclude_unset es clave aquí
+
+        # Ajustes manuales si es necesario (como el manejo de string vacío para marca que ya existía)
         if marca == "": update_data_dict['marca'] = None
         if 'precio_por_caja_referencia' not in update_data_dict and precio_por_caja_referencia is None and medicamento_original.precio_por_caja_referencia is not None:
             update_data_dict['precio_por_caja_referencia'] = None
-        if not update_data_dict:
+
+        # Importante: Pydantic con exclude_unset=True no incluirá `esta_activo` ni `vencimiento_receta`
+        # si sus valores son los default (None en MedicamentoUpdate).
+        # Pero nosotros queremos que se actualicen según el form (True/False para activo, y fecha o None para receta).
+        # Los valores ya están correctos en medicamento_data_update gracias a la creación del schema.
+        # El método .dict() de Pydantic es el que decide qué incluir basado en exclude_unset, etc.
+        # Para asegurar que estos campos se actualicen incluso si se setean a su valor "default" en el schema Update (como None),
+        # los añadimos explícitamente al diccionario si fueron proveídos (o si su valor es diferente al original).
+
+        update_data_dict = medicamento_data_update.dict(exclude_none=True) # exclude_none para campos que son None en el schema de update
+                                                                        # pero que queremos pasar a la BD como None (para borrar la fecha por ej.)
+                                                                        # No, mejor usar exclude_unset y añadir manualmente.
+
+        update_data_dict = medicamento_data_update.dict(exclude_unset=True)
+
+        # Asegurar que esta_activo siempre se considere para la actualización
+        update_data_dict['esta_activo'] = esta_activo_bool
+
+        # Manejar vencimiento_receta: si se envió un string vacío, vencimiento_receta_obj es None,
+        # y queremos que se guarde None en la BD. Si se envió una fecha válida, se guarda.
+        # Si no se envió nada para vencimiento_receta_str (es decir, el campo no estaba en el form o no se tocó),
+        # entonces vencimiento_receta_obj es None, y Pydantic (con exclude_unset) no lo incluiría.
+        # Pero si el usuario borró la fecha (enviando un string vacío), queremos pasar None.
+        if vencimiento_receta_str is not None: # Indica que el campo fue enviado, incluso si vacío
+            update_data_dict['vencimiento_receta'] = vencimiento_receta_obj
+        # Si vencimiento_receta_str es None (no se envió), y el original tenía fecha, no se actualiza.
+        # Si el original no tenía y no se envió, no se actualiza (queda None).
+        # Esto es un poco complejo. Simplifiquemos: siempre pasar el valor de vencimiento_receta_obj
+        # que ya hemos determinado (puede ser una fecha o None).
+        update_data_dict['vencimiento_receta'] = vencimiento_receta_obj
+
+
+        # Comprobar si hay cambios reales antes de hacer el update
+        if not update_data_dict: # Si el diccionario está vacío después de exclude_unset y nuestras adiciones
              return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+
+        # Lógica más precisa para "no cambios":
+        # Compara cada campo en update_data_dict con el original.
+        # Si todos los campos que se van a actualizar son iguales a los originales, entonces no hay cambio.
+        no_cambios_reales = True
+        if not update_data_dict: # Si está vacío, no hay cambios
+            no_cambios_reales = True
+        else:
+            for key, value in update_data_dict.items():
+                original_value = getattr(medicamento_original, key)
+                if key == 'vencimiento_receta' and isinstance(original_value, py_date) and isinstance(value, str):
+                    # Comparar fechas si el valor del form es string (no debería pasar si la conversión fue ok)
+                     try:
+                         value_date = py_date.fromisoformat(value)
+                         if original_value != value_date:
+                             no_cambios_reales = False; break
+                     except ValueError:
+                         no_cambios_reales = False; break # Formato inválido, es un cambio (erróneo)
+                elif original_value != value:
+                    no_cambios_reales = False; break
+
+        if no_cambios_reales:
+            return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+
         crud.actualizar_medicamento(db, medicamento_id=medicamento_id, datos_actualizacion=update_data_dict)
         return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
     except Exception as e:
@@ -779,6 +915,56 @@ async def reporte_costos_mensuales(
         "mes_seleccionado_info": mes_seleccionado_info,
         "costo_calculado": costo_calculado,
         "title": "Reporte de Costos Mensuales de Pedidos"
+    })
+
+@app.get("/reportes/stock-por-vencimiento/", name="reporte_stock_vencimiento")
+async def reporte_stock_por_vencimiento(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    lotes_por_vencimiento = crud.obtener_lotes_stock_ordenados_por_vencimiento(db)
+    return templates.TemplateResponse("reporte_stock_vencimiento.html", {
+        "request": request,
+        "lotes": lotes_por_vencimiento,
+        "title": "Reporte de Stock por Próximo Vencimiento"
+    })
+
+@app.get("/reportes/recetas-por-vencimiento/", name="reporte_recetas_vencimiento")
+async def reporte_recetas_por_vencimiento(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    medicamentos_por_vencimiento_receta = crud.obtener_medicamentos_activos_por_vencimiento_receta(db)
+    return templates.TemplateResponse("reporte_recetas_vencimiento.html", {
+        "request": request,
+        "medicamentos": medicamentos_por_vencimiento_receta,
+        "today": py_date.today(), # Para calcular días restantes en la plantilla
+        "title": "Reporte de Vencimiento de Recetas"
+    })
+
+# --- Ruta para Vista de Stock Global ---
+@app.get("/stock/", name="vista_stock_global")
+async def vista_stock_global(request: Request, db: Session = Depends(get_db_session_fastapi)):
+    medicamentos = crud.obtener_medicamentos(db, limit=1000)
+    stock_info_list = []
+    valor_total_stock_general = 0.0
+
+    for med in medicamentos:
+        stock_total_unidades = crud.calcular_stock_total_unidades(db, med.id)
+        valor_stock_medicamento = None
+        if med.precio_por_caja_referencia is not None and med.unidades_por_caja > 0:
+            precio_por_unidad = med.precio_por_caja_referencia / med.unidades_por_caja
+            valor_stock_medicamento = stock_total_unidades * precio_por_unidad
+            valor_total_stock_general += valor_stock_medicamento
+
+        stock_info_list.append({
+            "nombre": med.nombre,
+            "marca": med.marca,
+            "stock_total_unidades": stock_total_unidades,
+            "valor_stock_medicamento": valor_stock_medicamento,
+            "id": med.id,
+            "esta_activo": med.esta_activo # Pasar el estado a la plantilla
+        })
+
+    return templates.TemplateResponse("vista_stock_global.html", {
+        "request": request,
+        "stock_info_list": stock_info_list,
+        "valor_total_stock_general": valor_total_stock_general,
+        "title": "Vista Global de Stock"
     })
 
 

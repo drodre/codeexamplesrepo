@@ -8,6 +8,8 @@ class MedicamentoBase(BaseModel):
     marca: Optional[str] = None
     unidades_por_caja: int
     precio_por_caja_referencia: Optional[float] = None
+    esta_activo: Optional[bool] = True
+    vencimiento_receta: Optional[date] = None
 
 class MedicamentoCreate(MedicamentoBase):
     pass
@@ -18,9 +20,13 @@ class MedicamentoUpdate(MedicamentoBase):
     marca: Optional[str] = None
     unidades_por_caja: Optional[int] = None
     precio_por_caja_referencia: Optional[float] = None
+    esta_activo: Optional[bool] = None # Permitir que se actualice, None significa no cambiar
+    vencimiento_receta: Optional[date] = None # Permitir que se actualice o se borre (con None)
 
 class MedicamentoSchema(MedicamentoBase):
     id: int
+    esta_activo: bool # En el output, siempre será un booleano, no opcional
+    vencimiento_receta: Optional[date] # Puede ser None en el output
 
     class Config:
         orm_mode = True

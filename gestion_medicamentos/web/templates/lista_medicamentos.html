@@ -14,19 +14,23 @@
                 <th>Marca</th>
                 <th>Unidades/Caja</th>
                 <th>Stock Total (Unidades Activas)</th>
-                <th>Vencimiento Próximo</th>
+                <th>Vencimiento Próximo (Lote)</th>
+                <th>Vencimiento Receta</th>
+                <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for med_info in medicamentos_info %}
-            <tr>
+            <tr {% if not med_info.medicamento.esta_activo %}style="background-color: #f9f9f9; color: #777;"{% endif %}>
                 <td>{{ med_info.medicamento.id }}</td>
                 <td>{{ med_info.medicamento.nombre }}</td>
                 <td>{{ med_info.medicamento.marca if med_info.medicamento.marca else 'N/A' }}</td>
                 <td>{{ med_info.medicamento.unidades_por_caja }}</td>
                 <td>{{ med_info.stock_total }}</td>
                 <td>{{ med_info.vencimiento_proximo.strftime('%d/%m/%Y') if med_info.vencimiento_proximo else 'N/A' }}</td>
+                <td>{{ med_info.medicamento.vencimiento_receta.strftime('%d/%m/%Y') if med_info.medicamento.vencimiento_receta else '-' }}</td>
+                <td>{% if med_info.medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}</td>
                 <td>
                     <a href="{{ url_for('detalle_medicamento', medicamento_id=med_info.medicamento.id) }}">Ver Detalles</a> |
                     <a href="{{ url_for('editar_medicamento_form', medicamento_id=med_info.medicamento.id) }}">Editar</a> |
