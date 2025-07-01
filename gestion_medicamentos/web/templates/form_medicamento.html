@@ -27,6 +27,10 @@
         <label for="esta_activo">Medicamento Activo (en uso)</label>
         <input type="hidden" name="esta_activo_sentinel" value="true"> {# Para asegurar que el campo se envíe incluso si el checkbox no está marcado #}
     </div>
+    <div style="margin-top: 10px;">
+        <label for="vencimiento_receta">Vencimiento de Receta (Opcional):</label>
+        <input type="date" id="vencimiento_receta" name="vencimiento_receta" value="{{ medicamento.vencimiento_receta.isoformat() if medicamento and medicamento.vencimiento_receta else '' }}">
+    </div>
 
     {# Campo oculto para el método en caso de querer simular PUT/PATCH si el framework no lo soporta nativamente con forms HTML #}
     {# {% if medicamento %} <input type="hidden" name="_method" value="PUT"> {% endif %} #}

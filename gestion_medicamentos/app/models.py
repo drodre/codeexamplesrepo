@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Date, Float, ForeignKey, Enum as SQLAlchemyEnum, Boolean
 from sqlalchemy.orm import relationship, declarative_base
-from sqlalchemy.sql import func # Para valores por defecto como now()
+from sqlalchemy.sql import func, expression # Para valores por defecto como now() y server_default=expression.true()
 import enum
 
 Base = declarative_base()
@@ -22,7 +22,8 @@ class Medicamento(Base):
     # fecha_ultima_compra se puede obtener del lote más reciente
     # fecha_vencimiento_proxima se puede obtener del lote con vencimiento más cercano
     precio_por_caja_referencia = Column(Float, nullable=True) # Precio de referencia o último conocido
-    esta_activo = Column(Boolean, default=True, nullable=False, server_default='t') # Asumiendo True para la mayoría de BDs
+    esta_activo = Column(Boolean, default=True, nullable=False, server_default=expression.true())
+    vencimiento_receta = Column(Date, nullable=True) # Fecha de vencimiento de la receta, opcional
 
     lotes = relationship("LoteStock", back_populates="medicamento", cascade="all, delete-orphan")
     detalles_pedido = relationship("DetallePedido", back_populates="medicamento")
