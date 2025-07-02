@@ -12,7 +12,9 @@
         nav ul li a { color: #fff; text-decoration: none; font-weight: bold; }
         nav ul li a:hover { text-decoration: underline; }
         .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1, h2 { color: #333; }
+        /* Estilo general para h1, h2 fuera del header */
+        .container h1, .container h2, h2 { color: #333; }
+        header h1 { color: #fff; } /* Asegura que el h1 en el header sea blanco */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #5cb85c; color: white; }
@@ -30,8 +32,8 @@
                 <li><a href="{{ url_for('root') }}">Inicio</a></li>
                 <li><a href="{{ url_for('listar_todos_medicamentos') }}">Medicamentos</a></li>
                 <li><a href="{{ url_for('listar_todos_pedidos') }}">Pedidos</a></li>
-                <li><a href="{{ url_for('vista_stock_global') }}">Stock</a></li>
-                <li><a href="{{ url_for('reporte_costos_mensuales') }}">Reportes</a></li> {# Nuevo enlace a Reportes #}
+                <li><a href="{{ url_for('vista_stock_global') }}">Stock</a></li> {# Corregido enlace de Stock #}
+                <li><a href="{{ url_for('reporte_costos_mensuales') }}">Reportes</a></li>
             </ul>
         </nav>
     </header>
