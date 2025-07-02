@@ -17,14 +17,26 @@
         N/A
     {% endif %}
 </p>
+<p><strong>Consumo Diario Estimado (Unidades):</strong> {{ medicamento.consumo_diario_unidades if medicamento.consumo_diario_unidades is not none else 'No especificado' }}</p>
 <p><strong>Estado:</strong> <span style="font-weight: bold; color: {% if medicamento.esta_activo %}green{% else %}red{% endif %};">
     {% if medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}
 </span></p>
 <p><strong>Vencimiento de Receta:</strong> {{ medicamento.vencimiento_receta.strftime('%d/%m/%Y') if medicamento.vencimiento_receta else 'No aplica' }}</p>
 
-<h3>Stock y Vencimiento de Lotes</h3>
+<h3>Stock, Vencimiento de Lotes y Duración Estimada</h3>
 <p><strong>Stock Total (Unidades Activas de Lotes):</strong> {{ stock_total }}</p>
 <p><strong>Fecha de Vencimiento Próxima (Lotes Activos):</strong> {{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A' }}</p>
+{% if duracion_estimada_stock is not none %}
+<p><strong>Duración Estimada del Stock Actual:</strong>
+    {% if duracion_estimada_stock == "infinita" %}
+        Infinita (consumo diario no especificado o es cero)
+    {% elif duracion_estimada_stock == "no_stock" %}
+        No hay stock disponible
+    {% else %}
+        Aproximadamente {{ "%.0f" | format(duracion_estimada_stock) }} día(s)
+    {% endif %}
+</p>
+{% endif %}
 
 <h3>Lotes de Stock</h3>
 {% if lotes %}

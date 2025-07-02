@@ -31,6 +31,10 @@
         <label for="vencimiento_receta">Vencimiento de Receta (Opcional):</label>
         <input type="date" id="vencimiento_receta" name="vencimiento_receta" value="{{ medicamento.vencimiento_receta.isoformat() if medicamento and medicamento.vencimiento_receta else '' }}">
     </div>
+    <div style="margin-top: 10px;">
+        <label for="consumo_diario_unidades">Consumo Diario Estimado (Unidades, ej. 0.5 o 2):</label>
+        <input type="number" id="consumo_diario_unidades" name="consumo_diario_unidades" value="{{ medicamento.consumo_diario_unidades if medicamento and medicamento.consumo_diario_unidades is not none else '' }}" step="0.1" min="0">
+    </div>
 
     {# Campo oculto para el método en caso de querer simular PUT/PATCH si el framework no lo soporta nativamente con forms HTML #}
     {# {% if medicamento %} <input type="hidden" name="_method" value="PUT"> {% endif %} #}

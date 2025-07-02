@@ -24,6 +24,7 @@ class Medicamento(Base):
     precio_por_caja_referencia = Column(Float, nullable=True) # Precio de referencia o último conocido
     esta_activo = Column(Boolean, default=True, nullable=False, server_default=expression.true())
     vencimiento_receta = Column(Date, nullable=True) # Fecha de vencimiento de la receta, opcional
+    consumo_diario_unidades = Column(Float, nullable=True) # Unidades consumidas por día
 
     lotes = relationship("LoteStock", back_populates="medicamento", cascade="all, delete-orphan")
     detalles_pedido = relationship("DetallePedido", back_populates="medicamento")

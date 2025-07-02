@@ -15,7 +15,8 @@ from typing import List, Optional, Type # Para type hints
 def crear_medicamento(db: Session, nombre: str, marca: Optional[str], unidades_por_caja: int,
                       precio_por_caja_referencia: Optional[float] = None,
                       esta_activo: bool = True,
-                      vencimiento_receta: Optional[date] = None) -> models.Medicamento:
+                      vencimiento_receta: Optional[date] = None,
+                      consumo_diario_unidades: Optional[float] = None) -> models.Medicamento:
     """
     Crea un nuevo registro de medicamento en la base de datos.
     """
@@ -25,7 +26,8 @@ def crear_medicamento(db: Session, nombre: str, marca: Optional[str], unidades_p
         unidades_por_caja=unidades_por_caja,
         precio_por_caja_referencia=precio_por_caja_referencia,
         esta_activo=esta_activo,
-        vencimiento_receta=vencimiento_receta
+        vencimiento_receta=vencimiento_receta,
+        consumo_diario_unidades=consumo_diario_unidades
     )
     db.add(db_medicamento)
     db.commit()
