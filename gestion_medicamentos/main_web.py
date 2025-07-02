@@ -13,6 +13,8 @@ from datetime import date as py_date # Renombrar para evitar conflicto con model
 # Añadir el directorio de la aplicación al sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from datetime import timedelta # Importar timedelta
+
 try:
     from app import crud, models, database, schemas
 except ImportError as e:
@@ -409,30 +411,72 @@ async def detalle_medicamento(request: Request, medicamento_id: int, db: Session
     medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
     if not medicamento:
         return templates.TemplateResponse("error_404.html", {"request": request, "detail": f"Medicamento con ID {medicamento_id} no encontrado"}, status_code=404)
-    lotes = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False)
-    stock_total = crud.calcular_stock_total_unidades(db, medicamento_id=medicamento_id)
+
+    # Obtener lotes, priorizar activos y luego ordenados por fecha de vencimiento
+    # La función obtener_lotes_por_medicamento con solo_activos=False ya ordena por fecha_vencimiento_lote
+    # Necesitamos primero los activos y luego, si se quiere, los no activos.
+    # Para el cálculo de agotamiento, solo nos interesan los activos.
+    lotes_activos = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=True)
+    # Si se quieren mostrar todos los lotes en la tabla, pero calcular solo con activos:
+    todos_lotes_para_mostrar = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False)
+
+
+    stock_total = crud.calcular_stock_total_unidades(db, medicamento_id=medicamento_id) # Esto ya usa solo lotes activos
     vencimiento_proximo = crud.calcular_fecha_vencimiento_proxima(db, medicamento_id=medicamento_id)
     precio_por_unidad = None
     if medicamento.precio_por_caja_referencia is not None and medicamento.unidades_por_caja > 0:
         precio_por_unidad = medicamento.precio_por_caja_referencia / medicamento.unidades_por_caja
 
-    duracion_estimada_stock = None
+    duracion_estimada_stock_total_dias = None
     if medicamento.consumo_diario_unidades is not None and medicamento.consumo_diario_unidades > 0:
         if stock_total > 0:
-            duracion_estimada_stock = stock_total / medicamento.consumo_diario_unidades
+            duracion_estimada_stock_total_dias = stock_total / medicamento.consumo_diario_unidades
         else:
-            duracion_estimada_stock = "no_stock" # Indicador para la plantilla
-    elif stock_total > 0 : # Hay stock pero no consumo
-        duracion_estimada_stock = "infinita"
-    elif stock_total == 0 : # No hay stock ni consumo (o consumo es 0)
-        duracion_estimada_stock = "no_stock"
+            duracion_estimada_stock_total_dias = "no_stock"
+    elif stock_total > 0 :
+        duracion_estimada_stock_total_dias = "infinita"
+    elif stock_total == 0 :
+        duracion_estimada_stock_total_dias = "no_stock"
+
+    # Calcular fecha de agotamiento estimada para cada lote activo
+    lotes_con_agotamiento = []
+    fecha_consumo_acumulada = py_date.today()
+
+    if medicamento.consumo_diario_unidades is not None and medicamento.consumo_diario_unidades > 0:
+        for lote in lotes_activos: # Usar lotes_activos ordenados por vencimiento
+            dias_que_cubre_lote = lote.unidades_totales_lote / medicamento.consumo_diario_unidades
+            fecha_agotamiento_lote = fecha_consumo_acumulada + timedelta(days=dias_que_cubre_lote)
+            lotes_con_agotamiento.append({
+                "lote": lote,
+                "fecha_agotamiento_estimada": fecha_agotamiento_lote
+            })
+            fecha_consumo_acumulada = fecha_agotamiento_lote
+    else: # Si no hay consumo, no se puede calcular fecha de agotamiento
+        for lote in lotes_activos:
+            lotes_con_agotamiento.append({
+                "lote": lote,
+                "fecha_agotamiento_estimada": "Indeterminado (sin consumo)"
+            })
+
+    # Si queremos mostrar todos los lotes (activos e inactivos) y solo añadir la fecha de agotamiento a los activos:
+    # Haremos un mapeo para facilitar la búsqueda en la plantilla o enriquecer `todos_lotes_para_mostrar`
+    mapa_fechas_agotamiento = {item["lote"].id: item["fecha_agotamiento_estimada"] for item in lotes_con_agotamiento}
+
+    lotes_enriquecidos_para_mostrar = []
+    for lote_display in todos_lotes_para_mostrar:
+        fecha_agotamiento = mapa_fechas_agotamiento.get(lote_display.id)
+        lotes_enriquecidos_para_mostrar.append({
+            "lote_obj": lote_display, # El objeto lote original
+            "fecha_agotamiento_estimada_display": fecha_agotamiento if fecha_agotamiento else ("N/A" if lote_display.fecha_vencimiento_lote < py_date.today() else "Indeterminado (sin consumo)")
+        })
 
 
     return templates.TemplateResponse("detalle_medicamento.html", {
-        "request": request, "medicamento": medicamento, "lotes": lotes,
+        "request": request, "medicamento": medicamento,
+        "lotes_enriquecidos": lotes_enriquecidos_para_mostrar, # Usar esta variable en la plantilla
         "stock_total": stock_total, "vencimiento_proximo": vencimiento_proximo,
         "precio_por_unidad": precio_por_unidad,
-        "duracion_estimada_stock": duracion_estimada_stock,
+        "duracion_estimada_stock": duracion_estimada_stock_total_dias, # Renombrado para claridad
         "today_date": py_date.today(), "title": f"Detalle: {medicamento.nombre}"
     })
 

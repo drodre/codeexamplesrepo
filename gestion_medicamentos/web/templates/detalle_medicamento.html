@@ -48,23 +48,34 @@
                 <th>Unidades/Caja (Lote)</th>
                 <th>Total Unidades (Lote)</th>
                 <th>Fecha de Compra</th>
-                <th>Fecha de Vencimiento</th>
+                <th>Fecha de Vencimiento (Lote)</th>
+                <th>Fecha Estimada Agotamiento (Lote)</th>
                 <th>Precio Compra/Caja (Lote)</th>
                 <th>Activo (No Vencido)</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
-            {% for lote in lotes %}
-            <tr>
+            {% for item_lote_enriquecido in lotes_enriquecidos %}
+            {% set lote = item_lote_enriquecido.lote_obj %}
+            <tr {% if lote.fecha_vencimiento_lote < today_date %}style="background-color: #ffe0e0;"{% endif %}>
                 <td>{{ lote.id }}</td>
                 <td>{{ lote.cantidad_cajas }}</td>
                 <td>{{ lote.unidades_por_caja_lote }}</td>
                 <td>{{ lote.unidades_totales_lote }}</td>
                 <td>{{ lote.fecha_compra_lote.strftime('%d/%m/%Y') }}</td>
-                <td>{{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}</td>
+                <td {% if lote.fecha_vencimiento_lote < today_date %}class="text-danger font-weight-bold"{% endif %}>
+                    {{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}
+                </td>
+                <td>
+                    {% if item_lote_enriquecido.fecha_agotamiento_estimada_display is string %}
+                        {{ item_lote_enriquecido.fecha_agotamiento_estimada_display }}
+                    {% else %}
+                        {{ item_lote_enriquecido.fecha_agotamiento_estimada_display.strftime('%d/%m/%Y') if item_lote_enriquecido.fecha_agotamiento_estimada_display else 'N/A' }}
+                    {% endif %}
+                </td>
                 <td>{{ lote.precio_compra_lote_por_caja if lote.precio_compra_lote_por_caja is not none else 'N/A' }}</td>
-                <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No{% endif %}</td>
+                <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No (Vencido){% endif %}</td>
                 <td>
                     <a href="{{ url_for('editar_lote_form', lote_id=lote.id) }}" style="font-size: 0.9em; margin-right: 5px;">Editar</a>
                     <a href="{{ url_for('eliminar_lote_confirm_form', lote_id=lote.id) }}" style="font-size: 0.9em; color: #d9534f;">Eliminar</a>
