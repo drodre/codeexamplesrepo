@@ -50,8 +50,14 @@ async def listar_todos_medicamentos(request: Request, db: Session = Depends(get_
     for med in medicamentos:
         stock_total = crud.calcular_stock_total_unidades(db, med.id)
         vencimiento_proximo = crud.calcular_fecha_vencimiento_proxima(db, med.id)
+        precio_por_unidad = None
+        if med.precio_por_caja_referencia is not None and med.unidades_por_caja > 0:
+            precio_por_unidad = med.precio_por_caja_referencia / med.unidades_por_caja
         medicamentos_info.append({
-            "medicamento": med, "stock_total": stock_total, "vencimiento_proximo": vencimiento_proximo
+            "medicamento": med,
+            "stock_total": stock_total,
+            "vencimiento_proximo": vencimiento_proximo,
+            "precio_por_unidad": precio_por_unidad
         })
     return templates.TemplateResponse("lista_medicamentos.html", {
         "request": request, "medicamentos_info": medicamentos_info, "title": "Lista de Medicamentos"
@@ -324,9 +330,14 @@ async def detalle_medicamento(request: Request, medicamento_id: int, db: Session
     lotes = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False)
     stock_total = crud.calcular_stock_total_unidades(db, medicamento_id=medicamento_id)
     vencimiento_proximo = crud.calcular_fecha_vencimiento_proxima(db, medicamento_id=medicamento_id)
+    precio_por_unidad = None
+    if medicamento.precio_por_caja_referencia is not None and medicamento.unidades_por_caja > 0:
+        precio_por_unidad = medicamento.precio_por_caja_referencia / medicamento.unidades_por_caja
+
     return templates.TemplateResponse("detalle_medicamento.html", {
         "request": request, "medicamento": medicamento, "lotes": lotes,
         "stock_total": stock_total, "vencimiento_proximo": vencimiento_proximo,
+        "precio_por_unidad": precio_por_unidad,
         "today_date": py_date.today(), "title": f"Detalle: {medicamento.nombre}"
     })
 
@@ -946,10 +957,12 @@ async def vista_stock_global(request: Request, db: Session = Depends(get_db_sess
     for med in medicamentos:
         stock_total_unidades = crud.calcular_stock_total_unidades(db, med.id)
         valor_stock_medicamento = None
+        precio_por_unidad_ref = None
         if med.precio_por_caja_referencia is not None and med.unidades_por_caja > 0:
-            precio_por_unidad = med.precio_por_caja_referencia / med.unidades_por_caja
-            valor_stock_medicamento = stock_total_unidades * precio_por_unidad
-            valor_total_stock_general += valor_stock_medicamento
+            precio_por_unidad_ref = med.precio_por_caja_referencia / med.unidades_por_caja
+            valor_stock_medicamento = stock_total_unidades * precio_por_unidad_ref
+            if valor_stock_medicamento is not None: # Asegurarse de que valor_stock_medicamento no sea None antes de sumar
+                 valor_total_stock_general += valor_stock_medicamento
 
         stock_info_list.append({
             "nombre": med.nombre,
@@ -957,7 +970,8 @@ async def vista_stock_global(request: Request, db: Session = Depends(get_db_sess
             "stock_total_unidades": stock_total_unidades,
             "valor_stock_medicamento": valor_stock_medicamento,
             "id": med.id,
-            "esta_activo": med.esta_activo # Pasar el estado a la plantilla
+            "esta_activo": med.esta_activo,
+            "precio_por_unidad_referencia": precio_por_unidad_ref
         })
 
     return templates.TemplateResponse("vista_stock_global.html", {

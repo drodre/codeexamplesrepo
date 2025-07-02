@@ -14,6 +14,7 @@
                 <th>Marca</th>
                 <th>Unidades/Caja</th>
                 <th>Stock Total (Unidades Activas)</th>
+                <th>Precio/Unidad Ref.</th>
                 <th>Vencimiento Próximo (Lote)</th>
                 <th>Vencimiento Receta</th>
                 <th>Estado</th>
@@ -28,6 +29,13 @@
                 <td>{{ med_info.medicamento.marca if med_info.medicamento.marca else 'N/A' }}</td>
                 <td>{{ med_info.medicamento.unidades_por_caja }}</td>
                 <td>{{ med_info.stock_total }}</td>
+                <td class="text-right">
+                    {% if med_info.precio_por_unidad is not none %}
+                        {{ "%.2f €" | format(med_info.precio_por_unidad) }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
                 <td>{{ med_info.vencimiento_proximo.strftime('%d/%m/%Y') if med_info.vencimiento_proximo else 'N/A' }}</td>
                 <td>{{ med_info.medicamento.vencimiento_receta.strftime('%d/%m/%Y') if med_info.medicamento.vencimiento_receta else '-' }}</td>
                 <td>{% if med_info.medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}</td>
