@@ -117,6 +117,32 @@ def obtener_medicamentos_activos_por_vencimiento_receta(db: Session) -> List[mod
         .all()
     )
 
+def obtener_medicamentos_activos_con_vencimiento_proximo(db: Session) -> List[dict]:
+    """
+    Obtiene una lista de medicamentos activos que tienen lotes activos con fecha de vencimiento futura,
+    junto con su fecha de vencimiento más próxima y su stock total.
+    La lista se devuelve ordenada por la fecha de vencimiento más próxima del medicamento.
+    """
+    medicamentos_activos = db.query(models.Medicamento).filter(models.Medicamento.esta_activo == True).all()
+
+    medicamentos_con_info = []
+    for med in medicamentos_activos:
+        fecha_venc_proxima = calcular_fecha_vencimiento_proxima(db, med.id)
+        # calcular_fecha_vencimiento_proxima ya devuelve None si no hay lotes activos o todos están vencidos.
+        # Solo incluimos aquellos que tienen una fecha de vencimiento próxima válida.
+        if fecha_venc_proxima:
+            stock_total = calcular_stock_total_unidades(db, med.id)
+            medicamentos_con_info.append({
+                "medicamento": med,
+                "fecha_vencimiento_proxima_calculada": fecha_venc_proxima,
+                "stock_total_calculado": stock_total
+            })
+
+    # Ordenar la lista de diccionarios por la fecha_vencimiento_proxima_calculada
+    medicamentos_con_info.sort(key=lambda x: x["fecha_vencimiento_proxima_calculada"])
+
+    return medicamentos_con_info
+
 # --- Funciones de Utilidad/Calculadas para Medicamento ---
 
 def calcular_stock_total_unidades(db: Session, medicamento_id: int) -> int:

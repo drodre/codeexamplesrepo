@@ -11,7 +11,8 @@
     <li><a href="{{ url_for('listar_todos_pedidos') }}">Ver Pedidos</a> - Gestionar los pedidos de medicamentos.</li>
     <li><a href="{{ url_for('vista_stock_global') }}">Ver Stock Global</a> - Consultar el stock total y su valor.</li>
     <li><a href="{{ url_for('reporte_costos_mensuales') }}">Reporte de Costos Mensuales</a> - Ver costos de pedidos por mes.</li>
-    <li><a href="{{ url_for('reporte_stock_vencimiento') }}">Reporte de Stock por Vencimiento (Lotes)</a> - Listar lotes de stock activos ordenados por próxima fecha de vencimiento.</li>
+    <li><a href="{{ url_for('reporte_stock_vencimiento') }}">Reporte de Stock por Vencimiento (Lotes)</a> - Listar lotes de stock activos ordenados por próxima fecha de vencimiento de lote.</li>
+    <li><a href="{{ url_for('reporte_medicamentos_vencimiento') }}">Reporte de Medicamentos por Vencimiento</a> - Listar medicamentos activos ordenados por su próxima fecha de vencimiento general.</li>
     <li><a href="{{ url_for('reporte_recetas_vencimiento') }}">Reporte de Vencimiento de Recetas</a> - Listar medicamentos activos con recetas próximas a vencer.</li>
 </ul>
 <p>Actualmente, esta interfaz web se enfoca en la visualización de datos. La gestión (añadir, editar, eliminar) se realiza a través de la <a href="https://github.com/nombre_usuario/nombre_repo/blob/main/gestion_medicamentos/README.md#ejecuci%C3%B3n-de-la-aplicaci%C3%B3n-cli" target="_blank">interfaz de línea de comandos (CLI)</a>.</p>
