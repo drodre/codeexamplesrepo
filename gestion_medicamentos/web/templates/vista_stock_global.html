@@ -15,6 +15,7 @@
                 <th>Medicamento</th>
                 <th>Marca</th>
                 <th>Estado</th>
+                <th class="text-right">Precio/Unidad Ref.</th>
                 <th class="text-right">Stock Total (Unidades)</th>
                 <th class="text-right">Valor Estimado del Stock</th>
                 <th>Acciones</th>
@@ -35,6 +36,13 @@
                         <span style="color: green;">Activo</span>
                     {% else %}
                         <span style="color: red;">En Desuso</span>
+                    {% endif %}
+                </td>
+                <td class="text-right">
+                    {% if item.precio_por_unidad_referencia is not none %}
+                        {{ "%.2f €" | format(item.precio_por_unidad_referencia) }}
+                    {% else %}
+                        N/A
                     {% endif %}
                 </td>
                 <td class="text-right">{{ item.stock_total_unidades }}</td>
