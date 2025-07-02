@@ -17,17 +17,29 @@
         N/A
     {% endif %}
 </p>
+<p><strong>Consumo Diario Estimado (Unidades):</strong> {{ medicamento.consumo_diario_unidades if medicamento.consumo_diario_unidades is not none else 'No especificado' }}</p>
 <p><strong>Estado:</strong> <span style="font-weight: bold; color: {% if medicamento.esta_activo %}green{% else %}red{% endif %};">
     {% if medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}
 </span></p>
 <p><strong>Vencimiento de Receta:</strong> {{ medicamento.vencimiento_receta.strftime('%d/%m/%Y') if medicamento.vencimiento_receta else 'No aplica' }}</p>
 
-<h3>Stock y Vencimiento de Lotes</h3>
+<h3>Stock, Vencimiento de Lotes y Duración Estimada</h3>
 <p><strong>Stock Total (Unidades Activas de Lotes):</strong> {{ stock_total }}</p>
 <p><strong>Fecha de Vencimiento Próxima (Lotes Activos):</strong> {{ vencimiento_proximo.strftime('%d/%m/%Y') if vencimiento_proximo else 'N/A' }}</p>
+{% if duracion_estimada_stock is not none %}
+<p><strong>Duración Estimada del Stock Actual:</strong>
+    {% if duracion_estimada_stock == "infinita" %}
+        Infinita (consumo diario no especificado o es cero)
+    {% elif duracion_estimada_stock == "no_stock" %}
+        No hay stock disponible
+    {% else %}
+        Aproximadamente {{ "%.0f" | format(duracion_estimada_stock) }} día(s)
+    {% endif %}
+</p>
+{% endif %}
 
 <h3>Lotes de Stock</h3>
-{% if lotes %}
+{% if lotes_enriquecidos %}
     <table>
         <thead>
             <tr>
@@ -36,23 +48,34 @@
                 <th>Unidades/Caja (Lote)</th>
                 <th>Total Unidades (Lote)</th>
                 <th>Fecha de Compra</th>
-                <th>Fecha de Vencimiento</th>
+                <th>Fecha de Vencimiento (Lote)</th>
+                <th>Fecha Estimada Agotamiento (Lote)</th>
                 <th>Precio Compra/Caja (Lote)</th>
                 <th>Activo (No Vencido)</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
-            {% for lote in lotes %}
-            <tr>
+            {% for item_lote_enriquecido in lotes_enriquecidos %}
+            {% set lote = item_lote_enriquecido.lote_obj %}
+            <tr {% if lote.fecha_vencimiento_lote < today_date %}style="background-color: #ffe0e0;"{% endif %}>
                 <td>{{ lote.id }}</td>
                 <td>{{ lote.cantidad_cajas }}</td>
                 <td>{{ lote.unidades_por_caja_lote }}</td>
                 <td>{{ lote.unidades_totales_lote }}</td>
                 <td>{{ lote.fecha_compra_lote.strftime('%d/%m/%Y') }}</td>
-                <td>{{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}</td>
+                <td {% if lote.fecha_vencimiento_lote < today_date %}class="text-danger font-weight-bold"{% endif %}>
+                    {{ lote.fecha_vencimiento_lote.strftime('%d/%m/%Y') }}
+                </td>
+                <td>
+                    {% if item_lote_enriquecido.fecha_agotamiento_estimada_display is string %}
+                        {{ item_lote_enriquecido.fecha_agotamiento_estimada_display }}
+                    {% else %}
+                        {{ item_lote_enriquecido.fecha_agotamiento_estimada_display.strftime('%d/%m/%Y') if item_lote_enriquecido.fecha_agotamiento_estimada_display else 'N/A' }}
+                    {% endif %}
+                </td>
                 <td>{{ lote.precio_compra_lote_por_caja if lote.precio_compra_lote_por_caja is not none else 'N/A' }}</td>
-                <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No{% endif %}</td>
+                <td>{% if lote.fecha_vencimiento_lote >= today_date %}Sí{% else %}No (Vencido){% endif %}</td>
                 <td>
                     <a href="{{ url_for('editar_lote_form', lote_id=lote.id) }}" style="font-size: 0.9em; margin-right: 5px;">Editar</a>
                     <a href="{{ url_for('eliminar_lote_confirm_form', lote_id=lote.id) }}" style="font-size: 0.9em; color: #d9534f;">Eliminar</a>

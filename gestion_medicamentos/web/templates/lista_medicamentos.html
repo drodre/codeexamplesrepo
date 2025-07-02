@@ -15,6 +15,7 @@
                 <th>Unidades/Caja</th>
                 <th>Stock Total (Unidades Activas)</th>
                 <th>Precio/Unidad Ref.</th>
+                <th>Consumo Diario (Uds)</th>
                 <th>Vencimiento Próximo (Lote)</th>
                 <th>Vencimiento Receta</th>
                 <th>Estado</th>
@@ -36,6 +37,7 @@
                         N/A
                     {% endif %}
                 </td>
+                <td class="text-center">{{ med_info.medicamento.consumo_diario_unidades if med_info.medicamento.consumo_diario_unidades is not none else '-' }}</td>
                 <td>{{ med_info.vencimiento_proximo.strftime('%d/%m/%Y') if med_info.vencimiento_proximo else 'N/A' }}</td>
                 <td>{{ med_info.medicamento.vencimiento_receta.strftime('%d/%m/%Y') if med_info.medicamento.vencimiento_receta else '-' }}</td>
                 <td>{% if med_info.medicamento.esta_activo %}Activo{% else %}En Desuso{% endif %}</td>

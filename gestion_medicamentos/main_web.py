@@ -13,6 +13,8 @@ from datetime import date as py_date # Renombrar para evitar conflicto con model
 # Añadir el directorio de la aplicación al sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from datetime import timedelta # Importar timedelta
+
 try:
     from app import crud, models, database, schemas
 except ImportError as e:
@@ -110,30 +112,45 @@ async def crear_medicamento_submit(
     unidades_por_caja: int = Form(...), precio_por_caja_referencia: Optional[float] = Form(None),
     esta_activo_sentinel: Optional[str] = Form(None), esta_activo: Optional[str] = Form(None),
     vencimiento_receta_str: Optional[str] = Form(None, alias="vencimiento_receta"),
+    consumo_diario_unidades_str: Optional[str] = Form(None, alias="consumo_diario_unidades"),
     db: Session = Depends(get_db_session_fastapi)
 ):
     errors = []
     esta_activo_bool = True if esta_activo == "true" else False
     vencimiento_receta_obj: Optional[py_date] = None
+    consumo_diario_unidades_float: Optional[float] = None
 
     if vencimiento_receta_str:
         try:
             vencimiento_receta_obj = py_date.fromisoformat(vencimiento_receta_str)
+        except ValueError: # Solo error si no está vacío
+            if vencimiento_receta_str.strip():
+                errors.append({"loc": ["vencimiento_receta"], "msg": "Formato de fecha de vencimiento de receta inválido. Use YYYY-MM-DD."})
+
+    if consumo_diario_unidades_str and consumo_diario_unidades_str.strip():
+        try:
+            consumo_diario_unidades_float = float(consumo_diario_unidades_str)
+            if consumo_diario_unidades_float < 0:
+                errors.append({"loc": ["consumo_diario_unidades"], "msg": "El consumo diario no puede ser negativo."})
         except ValueError:
-            errors.append({"loc": ["vencimiento_receta"], "msg": "Formato de fecha de vencimiento de receta inválido. Use YYYY-MM-DD."})
+            errors.append({"loc": ["consumo_diario_unidades"], "msg": "El consumo diario debe ser un número válido."})
+    elif consumo_diario_unidades_str == "": # Si se envía vacío, se interpreta como None (borrar valor)
+        consumo_diario_unidades_float = None
+
 
     form_data_repop = {
         "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
         "precio_por_caja_referencia": precio_por_caja_referencia,
         "esta_activo": esta_activo_bool,
-        "vencimiento_receta": vencimiento_receta_obj # Para repopular, usar el objeto o None
+        "vencimiento_receta": vencimiento_receta_obj,
+        "consumo_diario_unidades": consumo_diario_unidades_float
     }
 
-    if errors: # Si hubo error en la conversión de fecha, retornar antes de validar con Pydantic
+    if errors:
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": "Añadir Nuevo Medicamento",
             "form_action": request.url_for("crear_medicamento_submit"),
-            "medicamento": form_data_repop, "errors": errors # form_data_repop ya tiene la fecha como objeto si fue válida
+            "medicamento": form_data_repop, "errors": errors
         }, status_code=422)
 
     try:
@@ -141,7 +158,8 @@ async def crear_medicamento_submit(
             "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
             "precio_por_caja_referencia": precio_por_caja_referencia,
             "esta_activo": esta_activo_bool,
-            "vencimiento_receta": vencimiento_receta_obj
+            "vencimiento_receta": vencimiento_receta_obj,
+            "consumo_diario_unidades": consumo_diario_unidades_float
         }
         medicamento_data = schemas.MedicamentoCreate(**medicamento_dict_for_schema)
 
@@ -166,7 +184,8 @@ async def crear_medicamento_submit(
                                unidades_por_caja=medicamento_data.unidades_por_caja,
                                precio_por_caja_referencia=medicamento_data.precio_por_caja_referencia,
                                esta_activo=medicamento_data.esta_activo,
-                               vencimiento_receta=medicamento_data.vencimiento_receta)
+                               vencimiento_receta=medicamento_data.vencimiento_receta,
+                               consumo_diario_unidades=medicamento_data.consumo_diario_unidades)
         return RedirectResponse(url=request.url_for("listar_todos_medicamentos"), status_code=303)
     except Exception as e:
         errors.append({"loc": ["general"], "msg": f"Error inesperado: {e}"})
@@ -194,6 +213,7 @@ async def editar_medicamento_submit(
     precio_por_caja_referencia: Optional[float] = Form(None),
     esta_activo_sentinel: Optional[str] = Form(None), esta_activo: Optional[str] = Form(None),
     vencimiento_receta_str: Optional[str] = Form(None, alias="vencimiento_receta"),
+    consumo_diario_unidades_str: Optional[str] = Form(None, alias="consumo_diario_unidades"),
     db: Session = Depends(get_db_session_fastapi)
 ):
     errors = []
@@ -203,15 +223,24 @@ async def editar_medicamento_submit(
 
     esta_activo_bool = True if esta_activo == "true" else False
     vencimiento_receta_obj: Optional[py_date] = None
+    consumo_diario_unidades_float: Optional[float] = None
 
-    if vencimiento_receta_str: # Si se envía algo (incluso vacío), intentar convertir
+    if vencimiento_receta_str:
         try:
             vencimiento_receta_obj = py_date.fromisoformat(vencimiento_receta_str)
         except ValueError:
-            # No añadir error aquí si el string está vacío, significa borrar la fecha
-            if vencimiento_receta_str.strip() != "":
+            if vencimiento_receta_str.strip():
                 errors.append({"loc": ["vencimiento_receta"], "msg": "Formato de fecha de vencimiento de receta inválido. Use YYYY-MM-DD."})
-    # Si vencimiento_receta_str es None o un string vacío, vencimiento_receta_obj será None, lo que es correcto para borrar la fecha.
+
+    if consumo_diario_unidades_str and consumo_diario_unidades_str.strip():
+        try:
+            consumo_diario_unidades_float = float(consumo_diario_unidades_str)
+            if consumo_diario_unidades_float < 0:
+                errors.append({"loc": ["consumo_diario_unidades"], "msg": "El consumo diario no puede ser negativo."})
+        except ValueError:
+            errors.append({"loc": ["consumo_diario_unidades"], "msg": "El consumo diario debe ser un número válido."})
+    elif consumo_diario_unidades_str == "": # Si el campo se envía vacío, se interpreta como None
+        consumo_diario_unidades_float = None
 
 
     form_data_repop = {
@@ -219,10 +248,11 @@ async def editar_medicamento_submit(
         "unidades_por_caja": unidades_por_caja,
         "precio_por_caja_referencia": precio_por_caja_referencia,
         "esta_activo": esta_activo_bool,
-        "vencimiento_receta": vencimiento_receta_obj # Usar el objeto para repopular
+        "vencimiento_receta": vencimiento_receta_obj,
+        "consumo_diario_unidades": consumo_diario_unidades_float
     }
 
-    if errors: # Error de formato de fecha
+    if errors:
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
             "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
@@ -234,14 +264,12 @@ async def editar_medicamento_submit(
             "nombre": nombre, "marca": marca, "unidades_por_caja": unidades_por_caja,
             "precio_por_caja_referencia": precio_por_caja_referencia,
             "esta_activo": esta_activo_bool,
-            "vencimiento_receta": vencimiento_receta_obj
+            "vencimiento_receta": vencimiento_receta_obj,
+            "consumo_diario_unidades": consumo_diario_unidades_float
         }
         medicamento_data_update = schemas.MedicamentoUpdate(**medicamento_dict_for_schema)
 
-    except ValidationError as e: # Otros errores de Pydantic
-        # Repopular con el medicamento original para el campo de fecha si la conversión falló antes y no se llegó aquí
-        # o si el error de Pydantic es sobre otro campo.
-        # form_data_repop ya tiene el valor correcto si la fecha se procesó.
+    except ValidationError as e:
         return templates.TemplateResponse("form_medicamento.html", {
             "request": request, "form_title": f"Editar Medicamento: {medicamento_original.nombre}",
             "form_action": request.url_for("editar_medicamento_submit", medicamento_id=medicamento_id),
@@ -297,33 +325,56 @@ async def editar_medicamento_submit(
         # Esto es un poco complejo. Simplifiquemos: siempre pasar el valor de vencimiento_receta_obj
         # que ya hemos determinado (puede ser una fecha o None).
         update_data_dict['vencimiento_receta'] = vencimiento_receta_obj
+        # Similar para consumo_diario_unidades
+        if consumo_diario_unidades_str is not None: # Campo fue enviado (incluso vacío)
+            update_data_dict['consumo_diario_unidades'] = consumo_diario_unidades_float
+        elif 'consumo_diario_unidades' in update_data_dict and consumo_diario_unidades_float is None:
+             # Asegurar que si Pydantic lo puso como None (porque era su default en Update), pero no se envió string vacío,
+             # y el original tenía un valor, no se borre.
+             # Esta lógica se complica. Es más simple: si el campo no fue enviado en el form, no lo incluyas en update_data_dict
+             # a menos que Pydantic lo haya puesto por un cambio válido.
+             # La línea `update_data_dict = medicamento_data_update.dict(exclude_unset=True)` es la clave.
+             # Solo necesitamos añadir explícitamente si el form envió un valor (incluso vacío para borrar).
+             pass # Ya está cubierto por la lógica anterior de `consumo_diario_unidades_float` y `medicamento_data_update`.
+        # Re-evaluación:
+        # `medicamento_data_update` ya tiene los valores correctos (incluyendo None si se borró un campo).
+        # `exclude_unset=True` podría quitar `consumo_diario_unidades=None` si el default en `MedicamentoUpdate` es `None`.
+        # Necesitamos asegurar que `None` se pase si el usuario borró el campo.
+        # La forma en que `form_data_repop` y `medicamento_dict_for_schema` se construyen ya asigna el `_float` o `_obj`
+        # que puede ser `None`. `MedicamentoUpdate(**medicamento_dict_for_schema)` lo capta.
+        # El `update_data_dict = medicamento_data_update.dict(exclude_unset=True)` es generalmente bueno.
+        # La adición explícita de `esta_activo` y `vencimiento_receta` (y ahora `consumo_diario_unidades`)
+        # es para asegurar que se incluyan incluso si el valor coincide con el default de `MedicamentoUpdate` (que es None).
+        update_data_dict['consumo_diario_unidades'] = consumo_diario_unidades_float
 
 
         # Comprobar si hay cambios reales antes de hacer el update
-        if not update_data_dict: # Si el diccionario está vacío después de exclude_unset y nuestras adiciones
-             return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
+        # if not update_data_dict: # Esta comprobación es demasiado simple ahora
+        #      return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
 
         # Lógica más precisa para "no cambios":
         # Compara cada campo en update_data_dict con el original.
         # Si todos los campos que se van a actualizar son iguales a los originales, entonces no hay cambio.
-        no_cambios_reales = True
-        if not update_data_dict: # Si está vacío, no hay cambios
-            no_cambios_reales = True
+
+        # Primero, asegurar que todos los campos relevantes estén en update_data_dict si se pretenden actualizar
+        # Esto ya se hace con las asignaciones explícitas de arriba para esta_activo, vencimiento_receta, consumo_diario
+
+        hay_cambios_efectivos = False
+        if not update_data_dict: # Si el diccionario está vacío
+            hay_cambios_efectivos = False
         else:
             for key, value in update_data_dict.items():
                 original_value = getattr(medicamento_original, key)
-                if key == 'vencimiento_receta' and isinstance(original_value, py_date) and isinstance(value, str):
-                    # Comparar fechas si el valor del form es string (no debería pasar si la conversión fue ok)
-                     try:
-                         value_date = py_date.fromisoformat(value)
-                         if original_value != value_date:
-                             no_cambios_reales = False; break
-                     except ValueError:
-                         no_cambios_reales = False; break # Formato inválido, es un cambio (erróneo)
-                elif original_value != value:
-                    no_cambios_reales = False; break
+                if original_value != value:
+                    # Tratar el caso de 0.0 vs None para campos float
+                    if isinstance(original_value, float) and original_value == 0.0 and value is None:
+                        pass # Considerar 0.0 y None como no cambio si el input vacío es None
+                    elif isinstance(value, float) and value == 0.0 and original_value is None:
+                         pass
+                    else:
+                        hay_cambios_efectivos = True; break
 
-        if no_cambios_reales:
+        if not hay_cambios_efectivos:
             return RedirectResponse(url=request.url_for("detalle_medicamento", medicamento_id=medicamento_id), status_code=303)
 
         crud.actualizar_medicamento(db, medicamento_id=medicamento_id, datos_actualizacion=update_data_dict)
@@ -360,17 +411,72 @@ async def detalle_medicamento(request: Request, medicamento_id: int, db: Session
     medicamento = crud.obtener_medicamento(db, medicamento_id=medicamento_id)
     if not medicamento:
         return templates.TemplateResponse("error_404.html", {"request": request, "detail": f"Medicamento con ID {medicamento_id} no encontrado"}, status_code=404)
-    lotes = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False)
-    stock_total = crud.calcular_stock_total_unidades(db, medicamento_id=medicamento_id)
+
+    # Obtener lotes, priorizar activos y luego ordenados por fecha de vencimiento
+    # La función obtener_lotes_por_medicamento con solo_activos=False ya ordena por fecha_vencimiento_lote
+    # Necesitamos primero los activos y luego, si se quiere, los no activos.
+    # Para el cálculo de agotamiento, solo nos interesan los activos.
+    lotes_activos = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=True)
+    # Si se quieren mostrar todos los lotes en la tabla, pero calcular solo con activos:
+    todos_lotes_para_mostrar = crud.obtener_lotes_por_medicamento(db, medicamento_id=medicamento_id, solo_activos=False)
+
+
+    stock_total = crud.calcular_stock_total_unidades(db, medicamento_id=medicamento_id) # Esto ya usa solo lotes activos
     vencimiento_proximo = crud.calcular_fecha_vencimiento_proxima(db, medicamento_id=medicamento_id)
     precio_por_unidad = None
     if medicamento.precio_por_caja_referencia is not None and medicamento.unidades_por_caja > 0:
         precio_por_unidad = medicamento.precio_por_caja_referencia / medicamento.unidades_por_caja
 
+    duracion_estimada_stock_total_dias = None
+    if medicamento.consumo_diario_unidades is not None and medicamento.consumo_diario_unidades > 0:
+        if stock_total > 0:
+            duracion_estimada_stock_total_dias = stock_total / medicamento.consumo_diario_unidades
+        else:
+            duracion_estimada_stock_total_dias = "no_stock"
+    elif stock_total > 0 :
+        duracion_estimada_stock_total_dias = "infinita"
+    elif stock_total == 0 :
+        duracion_estimada_stock_total_dias = "no_stock"
+
+    # Calcular fecha de agotamiento estimada para cada lote activo
+    lotes_con_agotamiento = []
+    fecha_consumo_acumulada = py_date.today()
+
+    if medicamento.consumo_diario_unidades is not None and medicamento.consumo_diario_unidades > 0:
+        for lote in lotes_activos: # Usar lotes_activos ordenados por vencimiento
+            dias_que_cubre_lote = lote.unidades_totales_lote / medicamento.consumo_diario_unidades
+            fecha_agotamiento_lote = fecha_consumo_acumulada + timedelta(days=dias_que_cubre_lote)
+            lotes_con_agotamiento.append({
+                "lote": lote,
+                "fecha_agotamiento_estimada": fecha_agotamiento_lote
+            })
+            fecha_consumo_acumulada = fecha_agotamiento_lote
+    else: # Si no hay consumo, no se puede calcular fecha de agotamiento
+        for lote in lotes_activos:
+            lotes_con_agotamiento.append({
+                "lote": lote,
+                "fecha_agotamiento_estimada": "Indeterminado (sin consumo)"
+            })
+
+    # Si queremos mostrar todos los lotes (activos e inactivos) y solo añadir la fecha de agotamiento a los activos:
+    # Haremos un mapeo para facilitar la búsqueda en la plantilla o enriquecer `todos_lotes_para_mostrar`
+    mapa_fechas_agotamiento = {item["lote"].id: item["fecha_agotamiento_estimada"] for item in lotes_con_agotamiento}
+
+    lotes_enriquecidos_para_mostrar = []
+    for lote_display in todos_lotes_para_mostrar:
+        fecha_agotamiento = mapa_fechas_agotamiento.get(lote_display.id)
+        lotes_enriquecidos_para_mostrar.append({
+            "lote_obj": lote_display, # El objeto lote original
+            "fecha_agotamiento_estimada_display": fecha_agotamiento if fecha_agotamiento else ("N/A" if lote_display.fecha_vencimiento_lote < py_date.today() else "Indeterminado (sin consumo)")
+        })
+
+
     return templates.TemplateResponse("detalle_medicamento.html", {
-        "request": request, "medicamento": medicamento, "lotes": lotes,
+        "request": request, "medicamento": medicamento,
+        "lotes_enriquecidos": lotes_enriquecidos_para_mostrar, # Usar esta variable en la plantilla
         "stock_total": stock_total, "vencimiento_proximo": vencimiento_proximo,
         "precio_por_unidad": precio_por_unidad,
+        "duracion_estimada_stock": duracion_estimada_stock_total_dias, # Renombrado para claridad
         "today_date": py_date.today(), "title": f"Detalle: {medicamento.nombre}"
     })
 
