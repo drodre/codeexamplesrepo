@@ -20,7 +20,40 @@ except ImportError as e:
     print(f"sys.path actual: {sys.path}")
     raise
 
-app = FastAPI(title="Gestor de Medicamentos Caseros - Web", version="0.1.0")
+# --- Configuración de Autenticación HTTP Basic ---
+import secrets
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+security = HTTPBasic()
+
+# !! ADVERTENCIA: Estas son credenciales de ejemplo. !!
+# !! NO USAR EN PRODUCCIÓN. Cambiar por un método seguro de gestión de credenciales. !!
+CORRECT_USERNAME = "admin"
+CORRECT_PASSWORD = "securepassword123" # Cambiar esto en un entorno real
+
+async def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    current_username_bytes = credentials.username.encode("utf8")
+    correct_username_bytes = CORRECT_USERNAME.encode("utf8")
+    is_correct_username = secrets.compare_digest(current_username_bytes, correct_username_bytes)
+
+    current_password_bytes = credentials.password.encode("utf8")
+    correct_password_bytes = CORRECT_PASSWORD.encode("utf8")
+    is_correct_password = secrets.compare_digest(current_password_bytes, correct_password_bytes)
+
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+# Aplicar autenticación a toda la aplicación
+app = FastAPI(
+    title="Gestor de Medicamentos Caseros - Web",
+    version="0.1.0",
+    dependencies=[Depends(verify_credentials)] # Proteger todas las rutas
+)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 templates_dir = os.path.join(current_dir, "web", "templates")
